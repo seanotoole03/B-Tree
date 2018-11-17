@@ -15,9 +15,9 @@ import javax.xml.soap.Node;
  */
 public class BTree<T extends Comparable>
 {
-	private BTreeNode root;
+	private BTreeNode root, parent, current;
 	private int degree;			//position 0 of file
-	private int BTreeNodeSize;	
+	private int BTreeNodeSize, nodeMaxObj;	
 	private int rootOffset;		//position 4 of file
 	private int insert;
 	private int nodeCount; // number of nodes in tree, position 8 of file
@@ -35,6 +35,7 @@ public class BTree<T extends Comparable>
     public BTree(int degree, String fileName, boolean useCache, int cacheSize)
     {
         BTreeNodeSize = 16 + (24*(degree)) - 4; //bytes
+        nodeMaxObj = (2*degree)-1;
         rootOffset = 0;
         insert = 0;
         nodeCount = 1;
@@ -71,37 +72,44 @@ public class BTree<T extends Comparable>
 	 */
 	public void insert(long k)
 	{
-
 	    BTreeNode r = root;
-        int i = r.getN();
-        if (i == (2 * degree - 1))
-        {
-            TreeObject obj = new TreeObject(k);
-            while (i > 0 && obj.compareTo(r.getKey(i-1)) < 0)
-            {
-                i--;
-            }
-     
-            if (i > 0 && obj.compareTo(r.getKey(i-1)) == 0)
-            {
-                r.getKey(i-1).increaseFrequency();
-            }
-            
-            else 
-            {
-                BTreeNode s = new BTreeNode();
-                s.setOffset(r.getOffset());
-                root = s;
-                r.setOffset(insert);
-                r.setParent(s.getOffset());
-                s.setIsLeaf(false);
-                s.addChild(r.getOffset());
-                splitChild(s,r,0);
-                insertNonfull(s,k);
-            }
+	    current = r;
+        TreeObject obj = new TreeObject(k);
+        boolean insertion = false;
+        while(insertion == false) {
+        	int i = current.getN(); //retrieve number of objects in current node
+	        while (i > 0 && obj.compareTo(current.getKey(i-1)) > 0) //search backwards to find first smaller object
+	        {
+	            i--;
+	        }
+	 
+	        if (i > 0 && obj.compareTo(current.getKey(i-1)) == 0) //found exact sequence in current node
+	        {
+	            r.getKey(i-1).increaseFrequency();
+	            insertion = true;
+	        }
+	        
+	        else 	//either i == 0, indicating this is smaller than anything in the array, or r.getKey(i-1) < obj.g 
+	        {		//either way, we will need to either insert the object in a child node, or in this node, if it is a leaf
+	        	if(current.isLeaf) { //safe to add object to
+	        		if(current.getN() == nodeMaxObj) { //current node is full
+	        			//TODO: Continue from here
+	        		}
+	        	}
+	        	if(current == r) {
+	        		parent = r;
+	        	}
+	            BTreeNode s = new BTreeNode();
+	            s.setOffset(r.getOffset());
+	            root = s;
+	            r.setOffset(r.getOffset()+BTreeNodeSize);
+	            s.setParent(s.getOffset());
+	            s.setIsLeaf(false);
+	            s.addChild(r.getOffset());
+	            splitChild(s,r,0);
+	            insertNonfull(s,k);
+	        }
         }
-        else
-            insertNonfull(r,k);
 	}
 	
 	 /**
@@ -157,7 +165,7 @@ public class BTree<T extends Comparable>
 	/**
 	 * @param x
 	 */
-	public void splitChild(BTreeNode x, BTreeNode y, int i)// splitting will be the only time where we have pointers
+	public void splitChild(BTreeNode x, BTreeNode y, int i)// splitting will be the only time where we add pointers
 	 {
 	    BTreeNode z = new BTreeNode();
         z.setIsLeaf(y.isLeaf());
@@ -289,18 +297,18 @@ public class BTree<T extends Comparable>
 			    }
 			    
 			    /**
-			     * @param n
+			     * @param address
 			     */
-			    public void addChild(int n)
+			    public void addChild(int address)
 			    {
-			        children.add(n);
+			        children.add(address);
 			    }
 			    
 			    /**
 			     * @param x
 			     * @param i
 			     */
-			    public void addChild(Integer x, int i)
+			    public void addChild(int x, int i)
 			    {
 			        children.add(i,x);
 			    }
@@ -334,7 +342,7 @@ public class BTree<T extends Comparable>
 			    }
 			    
 			    /**
-			     * This method gets the number of key-value pairs in the BTree
+			     * This method gets the number of objects in the BTree
 			     * 
 			     * @return
 			     */
@@ -344,7 +352,7 @@ public class BTree<T extends Comparable>
 			    }
 			    
 			    /**
-			     * This method sets the number of key-value pairs in the BTree
+			     * This method sets the number of objects in the BTree
 			     * 
 			     * @param i
 			     */
@@ -373,6 +381,7 @@ public class BTree<T extends Comparable>
 			    public void addKey(TreeObject obj)
 			    {
 			        keys.add(obj);
+			        n++;
 			    }
 			    
 			    /**
@@ -382,6 +391,7 @@ public class BTree<T extends Comparable>
 			    public void addKey(TreeObject obj, int i)
 			    {
 			        keys.add(i,obj);
+			        n++;
 			    }
 			    
 			    /**
@@ -433,6 +443,7 @@ public class BTree<T extends Comparable>
 			     */
 			    public TreeObject removeKey (int i)
 			    {
+			    	n--;
 			    	return keys.remove(i);
 			    }
 		}

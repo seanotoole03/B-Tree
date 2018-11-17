@@ -73,6 +73,9 @@ public class TreeObject implements Comparable<TreeObject>
 		frequency++;
 	}
 	
+	/**
+	 * 
+	 */
 	@Override
 	public int compareTo(TreeObject arg0) 
 	{
