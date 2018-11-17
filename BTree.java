@@ -1,3 +1,4 @@
+package lab4;
 
 import java.io.*;
 import java.util.ArrayList;
@@ -15,14 +16,14 @@ import javax.xml.soap.Node;
 public class BTree<T extends Comparable>
 {
 	private BTreeNode root;
-	private int degree;
-	private int BTreeNodeSize;
-	private int rootOffset;
+	private int degree;			//position 0 of file
+	private int BTreeNodeSize;	
+	private int rootOffset;		//position 4 of file
 	private int insert;
-	private int n; // number of key-value pairs in the BTree
+	private int nodeCount; // number of nodes in tree, position 8 of file
 	private int height; // height of the BTree 
-	
-
+	private File file;
+    private RandomAccessFile fileRead, fileWrite;
     /**
      * 
      * 
@@ -33,10 +34,34 @@ public class BTree<T extends Comparable>
      */
     public BTree(int degree, String fileName, boolean useCache, int cacheSize)
     {
-        BTreeNodeSize = 0;
+        BTreeNodeSize = 16 + (24*(degree)) - 4; //bytes
         rootOffset = 0;
-        insert = rootOffset + BTreeNodeSize;
-        this.degree = degree;        
+        insert = 0;
+        nodeCount = 1;
+        this.degree = degree;  
+        
+        file = new File(fileName);
+        try {
+        	fileRead = new RandomAccessFile(file, "r");
+        	fileWrite = new RandomAccessFile(file, "rw");
+        } catch (FileNotFoundException e) {
+        	e.printStackTrace();
+        }
+        
+        try {
+			fileWrite.writeInt(degree);
+			fileWrite.writeInt(rootOffset);
+			fileWrite.writeInt(nodeCount);
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+        
+        root = new BTreeNode();
+        
+        //TODO: Implement cache functionality
+        
+        
+        
     }
     
 	/**
@@ -194,7 +219,7 @@ public class BTree<T extends Comparable>
 	 */
 	public int size()
 	{
-		return n;
+		return nodeCount;
 	}
 
 	/**
@@ -225,9 +250,9 @@ public class BTree<T extends Comparable>
 		 */
 		public class BTreeNode 
 		{
-			    private int n; // number of key-value pairs in the BTree
-			    private LinkedList<TreeObject> keys;
-			    private LinkedList<Integer> children;
+			    private int n; // number of objects in the BTreeNode
+			    private ArrayList<TreeObject> keys;
+			    private ArrayList<Integer> children;
 			    private int parent;
 			    private int offset;
 			    private boolean isLeaf;
@@ -238,8 +263,8 @@ public class BTree<T extends Comparable>
 			    public BTreeNode()
 			    {
 			        parent = -1;
-			        keys = new LinkedList<TreeObject>();
-			        children = new LinkedList<Integer>();
+			        keys = new ArrayList<TreeObject>();
+			        children = new ArrayList<Integer>();
 			        n = 0;
 			    }
 			    
@@ -303,7 +328,7 @@ public class BTree<T extends Comparable>
 			     * 
 			     * @return
 			     */
-			    public LinkedList<Integer> getChildren()
+			    public ArrayList<Integer> getChildren()
 			    {
 			        return children;
 			    }
@@ -412,4 +437,7 @@ public class BTree<T extends Comparable>
 			    }
 		}
 	
+		
+		
+		
 }
