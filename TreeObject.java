@@ -67,6 +67,15 @@ public class TreeObject implements Comparable<TreeObject>
 	
 	/**
 	 * 
+	 * @param freq
+	 */
+	public void setFrequency(int freq)
+	{
+		this.frequency = freq;
+	}
+	
+	/**
+	 * 
 	 */
 	public void increaseFrequency()
 	{
