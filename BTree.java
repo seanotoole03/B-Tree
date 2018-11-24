@@ -10,7 +10,7 @@ import javax.xml.soap.Node;
 /**
  * This class
  * 
- * @author angelsanabria
+ * @author angelsanabria , seanotoole
  *
  */
 public class BTree<T extends Comparable>
@@ -26,13 +26,14 @@ public class BTree<T extends Comparable>
 	private int baseOffset = 16;
 	private File file;
     private RandomAccessFile fileRead, fileWrite;
+   
     /**
+     * Constructor for BTree - includes cache usage.
      * 
-     * 
-     * @param degree
-     * @param fileName
-     * @param useCache
-     * @param cacheSize
+     * @param degree - indicates desired size of nodes
+     * @param fileName - file to be written to, default will be 'file' for testing and specified filename format 
+     * @param useCache - indicates whether the user would like a cache to be used for easier manipulation of frequently used data
+     * @param cacheSize - desired size of cache (if used)
      */
     public BTree(int degree, String fileName, boolean useCache, int cacheSize)
     {
@@ -44,14 +45,14 @@ public class BTree<T extends Comparable>
         this.degree = degree;  
         
         file = new File(fileName);
-        try {
+        try { 	//Initialize RandcomAccessFile reader and writer
         	fileRead = new RandomAccessFile(file, "r");
         	fileWrite = new RandomAccessFile(file, "rw");
         } catch (FileNotFoundException e) {
         	e.printStackTrace();
         }
         
-        try {
+        try {	//Metadata writing
 			fileWrite.writeInt(degree);
 			fileWrite.writeInt(rootOffset);
 			fileWrite.writeInt(nodeCount);
@@ -68,9 +69,9 @@ public class BTree<T extends Comparable>
     }
     
 	/**
+	 * Inserting a long (binary string) into the B-Tree as a TreeObject or by incrementing an existing TreeObject
 	 * 
-	 * 
-	 * @param k
+	 * @param k - long to be inserted into tree, either as a new TreeObject, or by incrementing the frequency of an existing TreeObject.
 	 */
 	public void insert(long k)
 	{
@@ -79,13 +80,18 @@ public class BTree<T extends Comparable>
         TreeObject obj = new TreeObject(k);
         boolean insertion = false;
         while(insertion == false) {
+        	if(current.getN() == nodeMaxObj) { //current node is full
+    			//TODO: Split node and continue insertion loop afterwards - maybe directly use continue() command to skip rest of current loop?
+        		
+        		
+    		}
         	int i = current.getN(); //retrieve number of objects in current node
-	        while (i >= 0 && obj.compareTo(current.getKey(i-1)) > 0) //search backwards to find first smaller object
+	        while (i > 0 && obj.compareTo(current.getKey(i-1)) > 0) //search backwards to find first smaller object
 	        {
-	            i--;
+	            i--; //should bring us to either 
 	        }
 	 
-	        if (i >= 0 && obj.compareTo(current.getKey(i-1)) == 0) //found exact sequence in current node
+	        if (i > 0 && obj.compareTo(current.getKey(i-1)) == 0) //found exact sequence in current node
 	        {
 	            r.getKey(i-1).increaseFrequency(); //increment frequency of sequence, rather than create duplicates
 	            insertion = true;
@@ -94,10 +100,14 @@ public class BTree<T extends Comparable>
 	        else 	//either i == 0, indicating this is smaller than anything in the array, or r.getKey(i-1) < obj.g 
 	        {		//either way, we will need to either insert the object in a child node, or in this node, if it is a leaf
 	        	if(current.isLeaf == 1) { //safe to add object to
-	        		if(current.getN() == nodeMaxObj) { //current node is full
-	        			//TODO: Continue from here
-	        		}
+	        		//TODO: addToFront of arraylist of TreeObjects
+	        		
+	        		
+	        	} else { //internal node - we need to find child node to check next, and set that to be the current node
+	        		current = readNode(current.getChild(i+1));
 	        	}
+	        	
+	        	//TODO: What purpose does this serve? Is it still necessary?
 	        	if(current == r) {
 	        		parent = r;
 	        	}
@@ -114,12 +124,12 @@ public class BTree<T extends Comparable>
         }
 	}
 	
-	 /**
+	 /** TODO: review
+	  * Search BTree for specific long/DNA sequence
 	  * 
-	  * 
-	 * @param x
-	 * @param k
-	 * @return
+	 * @param x - current node being searched
+	 * @param k - long/key object being searched for
+	 * @return TreeObject representing the found TreeObject
 	 */
 	public TreeObject search(BTreeNode x, long k)
 	 {
@@ -214,9 +224,9 @@ public class BTree<T extends Comparable>
 	 }
 	
 	/**
+	 * Writes node into file - uses parent pointer in node metadata and degree of tree nodes to determine where this node should be written.
 	 * 
-	 * 
-	 * @return
+	 * @return Node written into file - should be the same as node passed in as parameter.
 	 */
 	public BTreeNode writeNode(BTreeNode x, int t) //node to write and degree of tree
 	{
@@ -236,12 +246,12 @@ public class BTree<T extends Comparable>
 			fileWrite.writeInt(x.getOffset());
 			fileWrite.writeInt(x.getParent());
 			fileWrite.writeInt(x.isLeaf());
-			for(int i = 0; i < x.getN(); i++) {
-				fileWrite.writeLong(x.getKey(i).getKey());
-				fileWrite.writeInt(x.getKey(i).getFrequency());
+			for(int i = 0; i < x.getN(); i++) { // only write as many objects as should currently be stored
+				fileWrite.writeLong(x.getKey(i).getKey());		//key for object
+				fileWrite.writeInt(x.getKey(i).getFrequency());	//frequency of object
 			}
 			fileWrite.seek(writeLocation + 16 + ((2*t) -1)*12); //move to start location of child pointer array
-			// start of node + metadata + size of TreeObject array
+																//start of node + metadata + size of TreeObject array
 			if(x.isLeaf() == 0) { //internal node, has pointers to track
 				for(int i = 0; i < 2*x.getN(); i++) { //could use getChildren.size(), but this should always be accurate, and better reflects desired behavior
 					fileWrite.writeInt(x.getChildren().get(i));
@@ -257,7 +267,7 @@ public class BTree<T extends Comparable>
 	}
 	
 	/**
-	 * 
+	 * Creates node by reading from location in file and parsing an empty node object with data parsed from that binary.
 	 * @param location
 	 * @return newly created node, read from binary in file
 	 */
@@ -265,6 +275,15 @@ public class BTree<T extends Comparable>
 		BTreeNode node = new BTreeNode();
 		try {
 			fileRead.seek(location);
+			/*
+			 * Order of read:
+			 * 1. Number of objects (int)
+			 * 2. This node's offset (int)
+			 * 3. Parent pointer (int)
+			 * 4. IsLeaf integer (should be 1 or 0, treated like boolean) (int)
+			 * 5. Iterate through key array to N-1 (key - long, frequency - int)
+			 * 6. If NOT leaf, iterate through child array to (2*N - 1) (int)
+			 */
 			node.setN(fileRead.readInt());
 			node.setOffset(fileRead.readInt());
 			node.setParent(fileRead.readInt());
@@ -276,7 +295,7 @@ public class BTree<T extends Comparable>
 				node.addKey(obj, i);
 			}
 			fileRead.seek(location + 16 + ((2*degree)-1)*12); //seek end of TreeObject array
-			if(node.isLeaf() == 0) {
+			if(node.isLeaf() == 0) { //internal node, should have child pointers
 				for(int i = 0; i < 2*node.getN(); i ++) {
 					node.addChild(fileRead.readInt(), i);
 				}
@@ -290,9 +309,9 @@ public class BTree<T extends Comparable>
 	}
 	
 	/**
+	 * Size() method for BTree
 	 * 
-	 * 
-	 * @return
+	 * @return current number of nodes
 	 */
 	public int size()
 	{
@@ -300,18 +319,18 @@ public class BTree<T extends Comparable>
 	}
 
 	/**
-	 * 
-	 * 
+	 * isEmpty() check for BTree
+	 * @return boolean representing result of statement 'size() == 0;'
 	 */
 	public boolean isEmpty()
 	{
 		return size() == 0;
 	}
 	
-	/**
+	/** TODO: Determine how to increment and accurately track height
+	 * Identifies current number of layers in BTree
 	 * 
-	 * 
-	 * @return
+	 * @return current height of BTree
 	 */
 	public int height()
 	{
@@ -322,7 +341,7 @@ public class BTree<T extends Comparable>
 		/**
 		 * This class
 		 * 
-		 * @author angelsanabria
+		 * @author angelsanabria 
 		 *
 		 */
 		public class BTreeNode 
@@ -351,7 +370,7 @@ public class BTree<T extends Comparable>
 			    
 			    /**
 			     * Set pointer to parent node location in memory
-			     * @param parent
+			     * @param parent pointer
 			     */
 			    public void setParent(int parent)
 			    {
@@ -361,7 +380,7 @@ public class BTree<T extends Comparable>
 			    /**
 			     * 
 			     * 
-			     * @return
+			     * @return pointer to location of parent node
 			     */
 			    public int getParent()
 			    {
@@ -369,7 +388,7 @@ public class BTree<T extends Comparable>
 			    }
 			    
 			    /**
-			     * @param address
+			     * @param address of a child node to be added to child array
 			     */
 			    public void addChild(int address)
 			    {
