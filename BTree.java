@@ -1,10 +1,7 @@
-package lab4;
-
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
-
 import javax.xml.soap.Node;
 
 /**
@@ -35,7 +32,7 @@ public class BTree<T extends Comparable>
      * @param useCache - indicates whether the user would like a cache to be used for easier manipulation of frequently used data
      * @param cacheSize - desired size of cache (if used)
      */
-    public BTree(int degree, String fileName, boolean useCache, int cacheSize)
+    public BTree(int degree, String fileName, boolean useCache)
     {
         BTreeNodeSize = 16 + (24*(degree)) - 4; //bytes
         nodeMaxObj = (2*degree)-1;
@@ -67,8 +64,6 @@ public class BTree<T extends Comparable>
         
         
     }
-    
-    
     
 	/**
 	 * Inserting a long (binary string) into the B-Tree as a TreeObject or by incrementing an existing TreeObject
@@ -170,8 +165,76 @@ public class BTree<T extends Comparable>
 	 */
 	public void insertNonfull(BTreeNode x, long k)
 	   {
-	  
+		 int i = x.getN();
+	        TreeObject obj = new TreeObject(k);
+	        if (x.isLeaf() == 0)
+	        {
+	            if (x.getN() != 0) 
+	            {
+	                while (i > 0 && obj.compareTo(x.getKey(i-1)) < 0){
+	                    i--;
+	                }
+	            }
+	            
+	            if (i > 0 && obj.compareTo(x.getKey(i-1)) == 0)
+	            {
+	                x.getKey(i-1).increaseFrequency();
+	            }
+	            
+	            else 
+	            {
+	                x.addKey(obj,i);
+	                x.setN(x.getN()+1);
+	            }
+	            writeNode(x,x.getOffset());
+	        }
+	        
+	        else 
+	        {
+	            while (i > 0 && (obj.compareTo(x.getKey(i-1)) < 0))
+	            {
+	                i--;
+	            }
+	            
+	            if (i > 0 && obj.compareTo(x.getKey(i-1)) == 0)
+	            {
+	                x.getKey(i-1).increaseFrequency();
+	                writeNode(x,x.getOffset());
+	                return;
+	            }
+	            
+	            int offset = x.getChild(i);
+	            BTreeNode y = readNode(offset);
+	            if (y.getN() == 2 * degree - 1)
+	            {
+	                int j = y.getN();
+	                while (j > 0 && obj.compareTo(y.getKey(j-1)) < 0)
+	                {
+	                    j--;
+	                }
+	                
+	                if (j > 0 && obj.compareTo(y.getKey(j-1)) == 0)
+	                {
+	                    y.getKey(j-1).increaseFrequency();
+	                    writeNode(y,y.getOffset());
+	                    return;
+	                }
+	                
+	                else 
+	                {
+	                    splitChild(x, y, i);
+	                        if (obj.compareTo(x.getKey(i)) > 0)
+	                        {
+	                            i++;
+	                        }
+	                }
+	            }
+	            offset = x.getChild(i);
+	            BTreeNode child = readNode(offset);
+	            insertNonfull(child,k);
+	        }
 	   }
+	
 	
 	
 	//test a root with two children.  Write  a value into node into memory.
@@ -192,7 +255,7 @@ public class BTree<T extends Comparable>
         for (int j = 0; j < degree - 1; j++)
         {
           
-            //z.setN(z.getN()+1);
+            //z.setN(z.getN()+1); 
             //y.setN(y.getN()-1); 
 
         }
@@ -258,7 +321,7 @@ public class BTree<T extends Comparable>
 			fileWrite.seek(writeLocation + 16 + ((2*t) -1)*12); //move to start location of child pointer array
 																//start of node + metadata + size of TreeObject array
 			if(x.isLeaf() == 0) { //internal node, has pointers to track
-				for(int i = 0; i < (x.getN()+1); i++) { //could use getChildren.size(), but this should always be accurate, and better reflects desired behavior
+				for(int i = 0; i < (x.getN() + 1); i++) { //could use getChildren.size(), but this should always be accurate, and better reflects desired behavior
 					fileWrite.writeInt(x.getChildren().get(i));
 				}
 			}
@@ -301,7 +364,7 @@ public class BTree<T extends Comparable>
 			}
 			fileRead.seek(location + 16 + ((2*degree)-1)*12); //seek end of TreeObject array
 			if(node.isLeaf() == 0) { //internal node, should have child pointers
-				for(int i = 0; i < (node.getN()+1); i ++) {
+				for(int i = 0; i < (node.getN() + 1); i ++) {
 					node.addChild(fileRead.readInt(), i);
 				}
 			}
