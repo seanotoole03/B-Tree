@@ -39,7 +39,7 @@ public class BTree<T extends Comparable>
     {
         BTreeNodeSize = 16 + (24*(degree)) - 4; //bytes
         nodeMaxObj = (2*degree)-1;
-        rootOffset = 0;
+        rootOffset = 16;
         insert = 0;
         nodeCount = 1;
         this.degree = degree;  
@@ -67,6 +67,8 @@ public class BTree<T extends Comparable>
         
         
     }
+    
+    
     
 	/**
 	 * Inserting a long (binary string) into the B-Tree as a TreeObject or by incrementing an existing TreeObject
@@ -104,7 +106,8 @@ public class BTree<T extends Comparable>
 	        		
 	        		
 	        	} else { //internal node - we need to find child node to check next, and set that to be the current node
-	        		current = readNode(current.getChild(i+1));
+	        		parent = current;
+	        		current = readNode(current.getChild(i));
 	        	}
 	        	
 	        	//TODO: What purpose does this serve? Is it still necessary?
@@ -113,8 +116,8 @@ public class BTree<T extends Comparable>
 	        	}
 	            BTreeNode s = new BTreeNode();
 	            s.setOffset(r.getOffset());
-	            root = s;
-	            r.setOffset(r.getOffset()+BTreeNodeSize);
+	            s = root;
+	            s.setOffset(r.getOffset()+BTreeNodeSize);
 	            s.setParent(s.getOffset());
 	            s.setIsLeaf(0); //false
 	            s.addChild(r.getOffset());
@@ -153,7 +156,9 @@ public class BTree<T extends Comparable>
 	        else 
 	        {
 	            int offset = x.getChild(i);
-	            return search(x,k);
+	            BTreeNode next = new BTreeNode();
+	            next = readNode(offset);
+	            return search(next,k);
 	        }
 	    }
 	
@@ -187,8 +192,8 @@ public class BTree<T extends Comparable>
         for (int j = 0; j < degree - 1; j++)
         {
           
-            //z.setN(z.getN()+1); //Not sure why this is done??
-            //y.setN(y.getN()-1); //Deprecated mathod - removeKey now decrements N
+            //z.setN(z.getN()+1);
+            //y.setN(y.getN()-1); 
 
         }
         
@@ -240,7 +245,7 @@ public class BTree<T extends Comparable>
 			 * 3. Parent pointer (int)
 			 * 4. IsLeaf integer (should be 1 or 0, treated like boolean) (int)
 			 * 5. Iterate through key array to N-1 (key - long, frequency - int)
-			 * 6. If NOT leaf, iterate through child array to (2*N - 1) (int)
+			 * 6. If NOT leaf, iterate through child array to (N+1) (int)
 			 */
 			fileWrite.writeInt(x.getN());
 			fileWrite.writeInt(x.getOffset());
@@ -253,7 +258,7 @@ public class BTree<T extends Comparable>
 			fileWrite.seek(writeLocation + 16 + ((2*t) -1)*12); //move to start location of child pointer array
 																//start of node + metadata + size of TreeObject array
 			if(x.isLeaf() == 0) { //internal node, has pointers to track
-				for(int i = 0; i < 2*x.getN(); i++) { //could use getChildren.size(), but this should always be accurate, and better reflects desired behavior
+				for(int i = 0; i < (x.getN()+1); i++) { //could use getChildren.size(), but this should always be accurate, and better reflects desired behavior
 					fileWrite.writeInt(x.getChildren().get(i));
 				}
 			}
@@ -296,7 +301,7 @@ public class BTree<T extends Comparable>
 			}
 			fileRead.seek(location + 16 + ((2*degree)-1)*12); //seek end of TreeObject array
 			if(node.isLeaf() == 0) { //internal node, should have child pointers
-				for(int i = 0; i < 2*node.getN(); i ++) {
+				for(int i = 0; i < (node.getN()+1); i ++) {
 					node.addChild(fileRead.readInt(), i);
 				}
 			}
@@ -305,7 +310,7 @@ public class BTree<T extends Comparable>
 			e.printStackTrace();
 		}
 		
-		return root;
+		return node;
 	}
 	
 	/**
