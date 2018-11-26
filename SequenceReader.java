@@ -1,4 +1,4 @@
-//written by Stephen Richardson, Sean O'Toole, Angel Sanabria
+//written by Stephen Richardson
 
 import java.io.*;
 import java.util.ArrayList;
@@ -33,7 +33,7 @@ public class SequenceReader {
 		String nextChar = "";
 		do {
 			nextChar = readSubSequence(fileReader);
-		} while (nextChar != "/");
+		} while (!nextChar.equals("/"));
 		
 		//if the file isn't empty, recursively call itself
 		if (fileReader.getFilePointer() < fileReader.length())
@@ -52,7 +52,7 @@ public class SequenceReader {
 		long longSub = 0;
 		
 		//if subsequence String is not empty, lop off the first two chars and find how values are in there
-		if (!subsequence.equals(""))
+		if (!subsequence.equals("") && !subsequence.equals(" "))
 		{
 			subsequence = subsequence.substring(2);
 			numValidReads = subsequence.length() / 2;
@@ -64,32 +64,32 @@ public class SequenceReader {
 //			currChar = fileReader.readChar();
 			currChar = Character.toString((char) fileReader.readByte());
 			//if good character found convert to binary and save in subsequence string
-			if (currChar == "a")
+			if (currChar.equals("a"))
 			{
 				numValidReads++;
 				subsequence += "00";
 			}
-			else if (currChar == "t")
+			else if (currChar.equals("t"))
 			{
 				numValidReads++;
 				subsequence += "11";
 			}
-			else if (currChar == "c")
+			else if (currChar.equals("c"))
 			{
 				numValidReads++;
 				subsequence += "01";						
 			}
-			else if (currChar == "g")
+			else if (currChar.equals("g"))
 			{
 				numValidReads++;
 				subsequence += "10";
 			}
 			//if n found,clear subsequence, find next valid value and return
-			else if(currChar == "n")
+			else if(currChar.equals("n"))
 			{
 				subsequence = "";
 				
-				while (currChar == "n")
+				while (currChar.equals("n"))
 				{
 					currChar = Byte.toString(fileReader.readByte());;
 				}
@@ -99,7 +99,7 @@ public class SequenceReader {
 				return currChar;
 			}
 			//the only other possible character is /, so if that is found, clear subsequence and exit
-			else if (currChar == "/")
+			else if (currChar.equals("/"))
 			{
 				subsequence = "";
 				return currChar;
@@ -108,7 +108,7 @@ public class SequenceReader {
 		}while (numValidReads < k);
 		
 		//subsequence should have 2k characters, all ones and zeros. convert into long and add to arrayList
-		longSub = Long.parseLong(subsequence);
+		longSub = Long.parseLong(subsequence,2);
 		subsequences.add(longSub);
 		System.out.println(subsequence);
 		
@@ -126,6 +126,7 @@ public class SequenceReader {
 			System.out.println("File not found.");
 			System.exit(0);
 		} catch (IOException e) {
+			e.printStackTrace();
 			System.out.println("IO Error.");
 			System.exit(0);
 		}
