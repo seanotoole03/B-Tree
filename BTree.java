@@ -38,6 +38,7 @@ public class BTree<T extends Comparable>
         nodeMaxObj = (2*degree)-1;
         rootOffset = 16;
         insert = 0;
+        height = 0;
         nodeCount = 1;
         this.degree = degree;  
         
@@ -53,6 +54,7 @@ public class BTree<T extends Comparable>
 			fileWrite.writeInt(degree);
 			fileWrite.writeInt(rootOffset);
 			fileWrite.writeInt(nodeCount);
+			fileWrite.writeInt(height);
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -105,19 +107,7 @@ public class BTree<T extends Comparable>
 	        		current = readNode(current.getChild(i));
 	        	}
 	        	
-	        	//TODO: What purpose does this serve? Is it still necessary?
-	        	if(current == r) {
-	        		parent = r;
-	        	}
-	            BTreeNode s = new BTreeNode();
-	            s.setOffset(r.getOffset());
-	            s = root;
-	            s.setOffset(r.getOffset()+BTreeNodeSize);
-	            s.setParent(s.getOffset());
-	            s.setIsLeaf(0); //false
-	            s.addChild(r.getOffset());
-	            splitChild(s,r,0);
-	            insertNonfull(s,k);
+	        	
 	        }
         }
 	}
@@ -165,74 +155,49 @@ public class BTree<T extends Comparable>
 	 */
 	public void insertNonfull(BTreeNode x, long k)
 	   {
-		 int i = x.getN();
+		 	int i = x.getN();
 	        TreeObject obj = new TreeObject(k);
-	        if (x.isLeaf() == 0)
-	        {
-	            if (x.getN() != 0) 
-	            {
-	                while (i > 0 && obj.compareTo(x.getKey(i-1)) < 0){
-	                    i--;
-	                }
-	            }
-	            
-	            if (i > 0 && obj.compareTo(x.getKey(i-1)) == 0)
-	            {
-	                x.getKey(i-1).increaseFrequency();
-	            }
-	            
-	            else 
-	            {
-	                x.addKey(obj,i);
-	                x.setN(x.getN()+1);
-	            }
-	            writeNode(x,x.getOffset());
-	        }
-	        
-	        else 
-	        {
-	            while (i > 0 && (obj.compareTo(x.getKey(i-1)) < 0))
-	            {
-	                i--;
-	            }
-	            
-	            if (i > 0 && obj.compareTo(x.getKey(i-1)) == 0)
-	            {
-	                x.getKey(i-1).increaseFrequency();
-	                writeNode(x,x.getOffset());
-	                return;
-	            }
-	            
-	            int offset = x.getChild(i);
-	            BTreeNode y = readNode(offset);
-	            if (y.getN() == 2 * degree - 1)
-	            {
-	                int j = y.getN();
-	                while (j > 0 && obj.compareTo(y.getKey(j-1)) < 0)
-	                {
-	                    j--;
-	                }
-	                
-	                if (j > 0 && obj.compareTo(y.getKey(j-1)) == 0)
-	                {
-	                    y.getKey(j-1).increaseFrequency();
-	                    writeNode(y,y.getOffset());
-	                    return;
-	                }
-	                
-	                else 
-	                {
-	                    splitChild(x, y, i);
-	                        if (obj.compareTo(x.getKey(i)) > 0)
-	                        {
-	                            i++;
-	                        }
-	                }
-	            }
-	            offset = x.getChild(i);
-	            BTreeNode child = readNode(offset);
-	            insertNonfull(child,k);
-	        }
+	        while (i > 0 && (obj.compareTo(x.getKey(i-1)) < 0))
+            {
+                i--;
+            }
+            
+            if (i > 0 && obj.compareTo(x.getKey(i-1)) == 0)
+            {
+                x.getKey(i-1).increaseFrequency();
+                writeNode(x,x.getOffset());
+                return;
+            }
+            
+            int offset = x.getChild(i);
+            BTreeNode y = readNode(offset);
+            if (y.getN() == 2 * degree - 1)
+            {
+                int j = y.getN();
+                while (j > 0 && obj.compareTo(y.getKey(j-1)) < 0)
+                {
+                    j--;
+                }
+                
+                if (j > 0 && obj.compareTo(y.getKey(j-1)) == 0)
+                {
+                    y.getKey(j-1).increaseFrequency();
+                    writeNode(y,y.getOffset());
+                    return;
+                }
+                
+                else 
+                {
+                    splitChild(x, y, i);
+                        if (obj.compareTo(x.getKey(i)) > 0)
+                        {
+                            i++;
+                        }
+                }
+            }
+            offset = x.getChild(i);
+            BTreeNode child = readNode(offset);
+            insertNonfull(child,k);
 	   }
 	
 	
