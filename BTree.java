@@ -60,6 +60,7 @@ public class BTree<T extends Comparable>
 		}
         
         root = new BTreeNode();
+        root.setOffset(0);
         
         //TODO: Implement cache functionality
         
@@ -164,23 +165,80 @@ public class BTree<T extends Comparable>
 	    rootOffset += BTreeNodeSize;
         z.setIsLeaf(current.isLeaf());
         z.setParent(current.getParent());
-        parent.addKey(current.removeKey(degree), currIndex); //grab middle object, push up to parent
-        parent.addChild(z.getOffset(), currIndex);
+        if(current.getParent() == 0) { //parent is root
+        	root.addKey(current.removeKey(degree), currIndex); //grab middle object, push up to parent
+        	root.addChild(z.getOffset(), currIndex);
+        } else {
+        	parent.addKey(current.removeKey(degree), currIndex); //grab middle object, push up to parent
+        	parent.addChild(z.getOffset(), currIndex);
+        }
         z.setN(degree-1);
         for (int j = 0; j < degree - 1; j++)
         {
-          z.addKey(current.removeKey(j), j);
+          z.addKey(current.removeKey(0), j);
         }
         
         if (!(current.isLeaf() == 1)) //we're splitting an internal node, 
         {
             for (int j = 0; j < degree; j++)
             {
-                z.addChild(current.removeChild(j), j);
+                z.addChild(current.removeChild(0), j);
             }
         }
         
+        return;
 	 }
+	
+	/**
+	 * SplitRoot - splits current root and allocates values within key and child pointer arrays to two new child nodes.
+	 */
+	public void splitRoot() {
+		BTreeNode childLeft = new BTreeNode();
+		childLeft.setN(degree-1);
+		childLeft.setOffset(rootOffset);
+		rootOffset += BTreeNodeSize;
+		childLeft.setParent(0);
+		childLeft.setIsLeaf(root.isLeaf());
+		
+		BTreeNode childRight = new BTreeNode();
+		childRight.setN(degree-1);
+		childRight.setOffset(rootOffset);
+		rootOffset += BTreeNodeSize;
+		childRight.setParent(0);
+		childRight.setIsLeaf(root.isLeaf());
+		
+		for (int j = 0; j < degree - 1; j++)
+        {
+          childLeft.addKey(root.getKey(j), j);
+          childRight.addKey(root.getKey(j + (degree)), j);
+        }
+		
+		for (int j = 0; j < ((2*degree) -1); j++)
+        {
+			root.removeKey(0);
+        }
+        
+        if (!(current.isLeaf() == 1)) //we're splitting an internal root 
+        {
+            for (int j = 0; j < degree; j++)
+            {
+            	childLeft.addChild(root.getChild(j), j);
+                childRight.addChild(root.getChild(j + (degree)), j);
+            }
+            for(int j = 0; j < 2*degree; j++) {
+            	root.removeChild(0);
+            }
+        }
+		
+        root.addChild(childLeft.getOffset());
+        root.addChild(childRight.getOffset());
+		
+		if(root.isLeaf() == 1) {
+			root.setIsLeaf(0); 
+		} 
+		
+		return;
+	}
 	
 	/**
 	 * Writes node into file - uses parent pointer in node metadata and degree of tree nodes to determine where this node should be written.
@@ -504,9 +562,6 @@ public class BTree<T extends Comparable>
 			    public void SetKey(int index, TreeObject newKey) {
 			    	keys.set(index, newKey);
 			    }
-		}
-	
-		
-		
+		}	
 		
 }
