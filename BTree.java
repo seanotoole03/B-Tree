@@ -34,7 +34,7 @@ public class BTree<T extends Comparable>
      */
     public BTree(int degree, String fileName, boolean useCache)
     {
-        BTreeNodeSize = 16 + (24*(degree)) - 4; //bytes
+        BTreeNodeSize = 8 + (24*(degree)); //bytes -- 16 + (2t - 1)*8 + (2t)*4
         nodeMaxObj = (2*degree)-1;
         rootOffset = 16;
         insert = 0;
@@ -50,7 +50,7 @@ public class BTree<T extends Comparable>
         	e.printStackTrace();
         }
         
-        try {	//Metadata writing
+        try {	//Metadata writing - 16 bytes in total
 			fileWrite.writeInt(degree);
 			fileWrite.writeInt(rootOffset);
 			fileWrite.writeInt(nodeCount);
@@ -147,59 +147,6 @@ public class BTree<T extends Comparable>
 	        }
 	    }
 	
-	/**
-	 * 
-	 * 
-	 * @param x
-	 * @param k
-	 */
-	public void insertNonfull(BTreeNode x, long k)
-	   {
-		 	int i = x.getN();
-	        TreeObject obj = new TreeObject(k);
-	        while (i > 0 && (obj.compareTo(x.getKey(i-1)) < 0))
-            {
-                i--;
-            }
-            
-            if (i > 0 && obj.compareTo(x.getKey(i-1)) == 0)
-            {
-                x.getKey(i-1).increaseFrequency();
-                writeNode(x,x.getOffset());
-                return;
-            }
-            
-            int offset = x.getChild(i);
-            BTreeNode y = readNode(offset);
-            if (y.getN() == 2 * degree - 1)
-            {
-                int j = y.getN();
-                while (j > 0 && obj.compareTo(y.getKey(j-1)) < 0)
-                {
-                    j--;
-                }
-                
-                if (j > 0 && obj.compareTo(y.getKey(j-1)) == 0)
-                {
-                    y.getKey(j-1).increaseFrequency();
-                    writeNode(y,y.getOffset());
-                    return;
-                }
-                
-                else 
-                {
-                    splitChild(x, y, i);
-                        if (obj.compareTo(x.getKey(i)) > 0)
-                        {
-                            i++;
-                        }
-                }
-            }
-            offset = x.getChild(i);
-            BTreeNode child = readNode(offset);
-            insertNonfull(child,k);
-	   }
-	
 	
 	
 	//test a root with two children.  Write  a value into node into memory.
@@ -210,50 +157,29 @@ public class BTree<T extends Comparable>
 	/**
 	 * @param x, y - 
 	 */
-	public void splitChild(BTreeNode x, BTreeNode y, int i)// splitting will be the only time where we add pointers
+	public void splitChild(BTreeNode parent, int currIndex, BTreeNode current)// splitting will be the only time where we add pointers
 	 {
-	    BTreeNode z = new BTreeNode();	//replacement for original node - new parent
-        z.setIsLeaf(y.isLeaf());
-        z.setParent(y.getParent());
-        z.addKey(y.removeKey(degree)); //grab middle object to serve as first key of new parent
-        z.setN(1);
+	    BTreeNode z = new BTreeNode();	//replacement for original node - new child
+	    z.setOffset(rootOffset);
+	    rootOffset += BTreeNodeSize;
+        z.setIsLeaf(current.isLeaf());
+        z.setParent(current.getParent());
+        parent.addKey(current.removeKey(degree), currIndex); //grab middle object, push up to parent
+        parent.addChild(z.getOffset(), currIndex);
+        z.setN(degree-1);
         for (int j = 0; j < degree - 1; j++)
         {
-          
-            //z.setN(z.getN()+1); 
-            //y.setN(y.getN()-1); 
-
+          z.addKey(current.removeKey(j), j);
         }
         
-        if (!(y.isLeaf() == 1)) //we're splitting an internal node
+        if (!(current.isLeaf() == 1)) //we're splitting an internal node, 
         {
             for (int j = 0; j < degree; j++)
             {
-                z.addChild(y.removeChild(degree));
+                z.addChild(current.removeChild(j), j);
             }
         }
         
-        x.addKey(y.removeKey(degree - 1), i);
-        x.setN(x.getN()+1);
-        y.setN(y.getN()-1);
-        if (x == root && x.getN() == 1)
-        {
-            writeNode(y,insert); //How do I read and write a node from binary
-            insert += BTreeNodeSize;
-            z.setOffset(insert);
-            x.addChild(z.getOffset(),i+1);
-            writeNode(z,insert);
-            writeNode(x,rootOffset);
-            insert += BTreeNodeSize;
-        }
-        else{
-            writeNode(y,y.getOffset());
-            z.setOffset(insert);
-            writeNode(z,insert);
-            x.addChild(z.getOffset(),i+1);
-            writeNode(x,x.getOffset());
-            insert += BTreeNodeSize;
-        }
 	 }
 	
 	/**
@@ -438,6 +364,7 @@ public class BTree<T extends Comparable>
 			    }
 			    
 			    /**
+			     * Removes child pointer from child array, returns that value
 			     * @param i
 			     * @return
 			     */
@@ -447,6 +374,7 @@ public class BTree<T extends Comparable>
 			    }
 			    
 			    /**
+			     * Gets value of child pointer from child array, returns that value
 			     * @param i
 			     * @return
 			     */
@@ -456,9 +384,9 @@ public class BTree<T extends Comparable>
 			    }
 			    
 			    /**
+			     * This method allows controlled access to the child pointer array
 			     * 
-			     * 
-			     * @return
+			     * @return child pointer array
 			     */
 			    public ArrayList<Integer> getChildren()
 			    {
@@ -548,7 +476,7 @@ public class BTree<T extends Comparable>
 			    }
 			    
 			    /**
-			     * This method checks if its a leaf
+			     * This method checks if this a leaf
 			     * 
 			     * @return true or false
 			     */
@@ -566,6 +494,15 @@ public class BTree<T extends Comparable>
 			    public TreeObject removeKey (int i)
 			    {
 			    	return keys.remove(i);
+			    }
+			    
+			    /**
+			     * This method sets (overwrites) the current key at a location in the keys ArrayList
+			     * @param index - index in keys array to overwrite to
+			     * @param newKey - new TreeObject to replace existing
+			     */
+			    public void SetKey(int index, TreeObject newKey) {
+			    	keys.set(index, newKey);
 			    }
 		}
 	
