@@ -60,7 +60,10 @@ public class BTree<T extends Comparable>
 		}
         
         root = new BTreeNode();
+        root.setN(0);
         root.setOffset(0);
+        root.setParent(0);
+        root.setIsLeaf(1); //New tree should have a root that is a leaf.
         
         //TODO: Implement cache functionality
         
@@ -81,8 +84,28 @@ public class BTree<T extends Comparable>
         boolean insertion = false;
         while(insertion == false) {
         	if(current.getN() == nodeMaxObj) { //current node is full
-    			//TODO: Split node and continue insertion loop afterwards - maybe directly use continue() command to skip rest of current loop?
+        		//TODO: How should we move the loop back up to the parent node? We will need to restart search from one level up.
+        		// 1 DEC - Added code to splitting child nodes to move pointers up to appropriate locations - test at meeting
+        		if(current == root) { //splitting root
+        			splitRoot();
+        			
+        			
+        		} else { //splitting standard node, should split around center (degree)
+        			splitChild(parent, degree, current);
+        			
+        			//move up to parent to resume search/insert, check first if moving up to root to prevent reading from invalid location
+        			if(parent == root) {
+        				current = root;
+        			} else if(parent.getParent() == 0) { //parent's parent is root
+        				current = parent;
+        				parent = root;
+        			} else { //standard internal or leaf node at least 2 levels deep
+        				current = parent;
+        				parent = readNode(parent.getParent()); //read parent from file
+        			}
+        		}
         		
+        		continue; //end current loop, resume search/insert 
         		
     		}
         	int i = current.getN(); //retrieve number of objects in current node
@@ -93,27 +116,27 @@ public class BTree<T extends Comparable>
 	 
 	        if (i > 0 && obj.compareTo(current.getKey(i-1)) == 0) //found exact sequence in current node
 	        {
-	            r.getKey(i-1).increaseFrequency(); //increment frequency of sequence, rather than create duplicates
+	            current.getKey(i-1).increaseFrequency(); //increment frequency of sequence, rather than create duplicates
 	            insertion = true;
 	        }
 	        
-	        else 	//either i == 0, indicating this is smaller than anything in the array, or r.getKey(i-1) < obj.g 
+	        else 	//either i == 0, indicating this is smaller than anything in the array, or current.getKey(i-1) < obj.g 
 	        {		//either way, we will need to either insert the object in a child node, or in this node, if it is a leaf
 	        	if(current.isLeaf == 1) { //safe to add object to
-	        		//TODO: addToFront of arraylist of TreeObjects
-	        		
+	        		//TODO: add object to arraylist at current location (i, where i == 0 and/or is correct index to insert at)
+	        		current.addKey(obj, i);
 	        		
 	        	} else { //internal node - we need to find child node to check next, and set that to be the current node
 	        		parent = current;
 	        		current = readNode(current.getChild(i));
 	        	}
 	        	
-	        	
+	        	//process should repeat itself until match found or object inserted
 	        }
         }
 	}
 	
-	 /** TODO: review
+	 /** 
 	  * Search BTree for specific long/DNA sequence
 	  * 
 	 * @param x - current node being searched
@@ -124,7 +147,7 @@ public class BTree<T extends Comparable>
 	 {
 	        int i = 0;
 	        TreeObject obj = new TreeObject(k);
-	        while (i < x.getN() && (obj.compareTo(x.getKey(i)) > 0))
+	        while (i < x.getN() && (obj.compareTo(x.getKey(i)) > 0)) //find first equal or larger object
 	        {
 	            i++;
 	        }
@@ -139,7 +162,7 @@ public class BTree<T extends Comparable>
 	            return null;
 	        }
 	        
-	        else 
+	        else //recursively search next lower node
 	        {
 	            int offset = x.getChild(i);
 	            BTreeNode next = new BTreeNode();
@@ -173,19 +196,22 @@ public class BTree<T extends Comparable>
         	parent.addChild(z.getOffset(), currIndex);
         }
         z.setN(degree-1);
-        for (int j = 0; j < degree - 1; j++)
+        for (int j = 0; j < degree - 1; j++) //pass front half of values in array to new node
         {
-          z.addKey(current.removeKey(0), j);
+          z.addKey(current.removeKey(0), j); 
         }
         
-        if (!(current.isLeaf() == 1)) //we're splitting an internal node, 
+        if (!(current.isLeaf() == 1)) //we're splitting an internal node, children pointers should be allocated to new locations/nodes
         {
             for (int j = 0; j < degree; j++)
             {
                 z.addChild(current.removeChild(0), j);
             }
         }
-        
+        //update/add nodes in file appropriately
+        writeNode(parent, parent.getOffset());
+        writeNode(current, current.getOffset());
+        writeNode(z, z.getOffset());
         return;
 	 }
 	
@@ -236,6 +262,10 @@ public class BTree<T extends Comparable>
 		if(root.isLeaf() == 1) {
 			root.setIsLeaf(0); 
 		} 
+		
+		//write root's new children into file at appropriate location
+		writeNode(childLeft, childLeft.getOffset());
+		writeNode(childRight, childRight.getOffset());
 		
 		return;
 	}
@@ -562,6 +592,9 @@ public class BTree<T extends Comparable>
 			    public void SetKey(int index, TreeObject newKey) {
 			    	keys.set(index, newKey);
 			    }
-		}	
+		}
+	
+		
+		
 		
 }
