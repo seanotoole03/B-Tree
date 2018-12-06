@@ -187,31 +187,34 @@ public class BTree<T>
 	//judge the pointers with the size of node, based on degree
 	
 	/**
-	 * @param x, y - 
+	 * 
+	 * @param parent
+	 * @param currIndex
+	 * @param current
 	 */
-	public void splitChild(BTreeNode parent, int currIndex, BTreeNode current)// splitting will be the only time where we add pointers
+	public void splitChild(BTreeNode parent, int currIndex, BTreeNode current)	// splitting will be the only time where we add pointers
 	 {
 	    BTreeNode z = new BTreeNode();	//new child
 	    z.setOffset(rootOffset);
 	    rootOffset += BTreeNodeSize;
         z.setIsLeaf(current.isLeaf());
         z.setParent(current.getParent());
-        if(current.getParent() == 0) { //parent is root
-        	root.addKey(current.removeKey(degree), currIndex); //grab middle object, push up to parent
+        if(current.getParent() == 0) { 	//parent is root
+        	root.addKey(current.removeKey(degree-1), currIndex); 		//grab middle object, push up to parent
         	root.addChild(z.getOffset(), currIndex);
-        } else {
-        	parent.addKey(current.removeKey(degree), currIndex); //grab middle object, push up to parent
+        } else { 
+        	parent.addKey(current.removeKey(degree-1), currIndex); 		//grab middle object, push up to parent
         	parent.addChild(z.getOffset(), currIndex);
         }
         z.setN(degree-1);
-        for (int j = 0; j < degree - 1; j++) //pass front half of values in array to new node
+        for (int j = 0; j < (degree - 1); j++) 	//pass front half of values in array to new node
         {
           z.addKey(current.removeKey(0), j); 
         }
         current.setN(degree-1);
         parent.setN(parent.getN()+1);
         
-        if (!(current.isLeaf() == 1)) //we're splitting an internal node, children pointers should be allocated to new locations/nodes
+        if (!(current.isLeaf() == 1)) 	//we're splitting an internal node, children pointers should be allocated to new locations/nodes
         {
             for (int j = 0; j < degree; j++)
             {

@@ -1,4 +1,4 @@
-package lab4;
+
 
 /**
  * 
@@ -96,4 +96,29 @@ public class TreeObject implements Comparable<TreeObject>
 		return 0;
 	}
 	
+	/**
+	 * 
+	 */
+	public String toDNAString(int seqLength) {
+		String str = Long.toBinaryString(key);
+		String ret = "";
+		while(str.length() < 64) {
+			str = "0" + str;
+		}
+		//should create a string of sequenceLength using binary string created
+		for(int i = (64 - 2*seqLength); i < 62; i += 2) {
+			String bits = str.substring(i, i+2);
+			if(bits.equals("00")) {
+				ret += "a";
+			} else if(bits.equals("11")) {
+				ret += "t";
+			} else if(bits.equals("01")) {
+				ret += "c";
+			} else { //bits.equals("10")
+				ret += "g";
+			}
+		}
+		return ret;
+		
+	}
 }
