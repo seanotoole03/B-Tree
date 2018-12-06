@@ -8,6 +8,7 @@ import javax.xml.soap.Node;
  * This class
  * 
  * @author angelsanabria , seanotoole
+ * cache implementation by Stephen Richardson
  *
  */
 public class BTree<T>
@@ -22,6 +23,8 @@ public class BTree<T>
 	private int baseOffset = 16;
 	private File file;
     private RandomAccessFile fileRead, fileWrite;
+    private BTreeCache cache;
+    private int cacheSize;
    
     /**
      * Constructor for BTree - includes cache usage.
@@ -71,10 +74,35 @@ public class BTree<T>
         root.setParent(0);
         root.setIsLeaf(1); //New tree should have a root that is a leaf.
         
-        //TODO: Implement cache functionality
+        //CACHE IMPLEMENTATION NOTES//
         
+        /*when using cache, if something is found, cache will return the entire node.
+        otherwise it will return null.
         
+        if a node is returned, once any changes have been made, before writing to the 
+        file, call cache.replaceFirst(NodeWeChanged);
         
+        if null was found, it means no matching nodes are in cache, so normal search
+        is used. once node is found and changed, before writing to the file
+        call cache.addObject(Node we changed/made);
+        */
+    }
+    
+    //initializing the cache, to be called from the search and create driver classes
+    public void initCache(int maxSize)
+    {
+    	//create new cache if it doesn't exist
+    	if (cache == null)
+    	{
+			cacheSize = maxSize;
+			cache = new BTreeCache(cacheSize);
+    	}
+    	//otherwise clear the existing cache and reset maxSize
+    	else
+    	{
+    		cache.clearCache();
+    		cache.maxSize = maxSize;
+    	}
     }
     
 	/**
