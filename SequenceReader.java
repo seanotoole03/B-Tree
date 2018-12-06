@@ -5,12 +5,24 @@ import java.util.ArrayList;
 
 public class SequenceReader {
 	
-	private static File fileRead = new File("test1.gbk");
-	public static ArrayList<Long> subsequences = new ArrayList<Long>();
+	private static File fileRead = new File("test5.gbk");
+	private static ArrayList<Long> subsequences = new ArrayList<Long>();
 	private static int k = 10;
 	private static String subsequence = "";
 	
-	public static void sequenceReader(RandomAccessFile fileReader) throws IOException
+	
+	public SequenceReader(String fileName, int seqLength) {
+		fileRead = new File(fileName);
+		subsequences = new ArrayList<Long>();
+		k = seqLength;
+		subsequence = "";
+	}
+	
+	public ArrayList<Long> getSubsequences(){
+		return subsequences;
+	}
+	
+	public void sequenceReader(RandomAccessFile fileReader) throws IOException
 	{
 		boolean originFound = false;
 		
@@ -18,9 +30,10 @@ public class SequenceReader {
 		while (fileReader.getFilePointer() < fileReader.length() && originFound == false) 
 		{
 			String fileLine = fileReader.readLine();
-			System.out.println(fileLine);
+			//System.out.println(fileLine);
 			if (fileLine.contains("ORIGIN"))
 			{
+				System.out.println("Origin found");
 				originFound = true;
 			}
 		}
@@ -64,32 +77,32 @@ public class SequenceReader {
 //			currChar = fileReader.readChar();
 			currChar = Character.toString((char) fileReader.readByte());
 			//if good character found convert to binary and save in subsequence string
-			if (currChar.equals("a"))
+			if (currChar.equalsIgnoreCase("a"))
 			{
 				numValidReads++;
 				subsequence += "00";
 			}
-			else if (currChar.equals("t"))
+			else if (currChar.equalsIgnoreCase("t"))
 			{
 				numValidReads++;
 				subsequence += "11";
 			}
-			else if (currChar.equals("c"))
+			else if (currChar.equalsIgnoreCase("c"))
 			{
 				numValidReads++;
 				subsequence += "01";						
 			}
-			else if (currChar.equals("g"))
+			else if (currChar.equalsIgnoreCase("g"))
 			{
 				numValidReads++;
 				subsequence += "10";
 			}
 			//if n found,clear subsequence, find next valid value and return
-			else if(currChar.equals("n"))
+			else if(currChar.equalsIgnoreCase("n"))
 			{
 				subsequence = "";
 				
-				while (currChar.equals("n"))
+				while (currChar.equalsIgnoreCase("n"))
 				{
 					currChar = Byte.toString(fileReader.readByte());;
 				}
@@ -110,17 +123,19 @@ public class SequenceReader {
 		//subsequence should have 2k characters, all ones and zeros. convert into long and add to arrayList
 		longSub = Long.parseLong(subsequence,2);
 		subsequences.add(longSub);
-		System.out.println(subsequence);
+		//System.out.println(subsequence);
 		
 		return currChar;
 	}
 
 	public static void main(String[] args) 
 	{
+		SequenceReader seqR = new SequenceReader("test5.gbk", 10);
+		//USE IN CreateBTree
 		try 
 		{
 			RandomAccessFile fileReader = new RandomAccessFile(fileRead, "r");
-			sequenceReader(fileReader);
+			seqR.sequenceReader(fileReader);
 			
 		} catch (FileNotFoundException e) {
 			System.out.println("File not found.");
@@ -131,10 +146,16 @@ public class SequenceReader {
 			System.exit(0);
 		}
 		
+		/**
 		for(int i = 0;i < subsequences.size();i++)
 		{
-			System.out.println(subsequences.get(i));
+			String lbs = Long.toBinaryString(subsequences.get(i));
+			for(int j = lbs.length(); j < 20; j++) {
+				lbs = "0" + lbs;
+			}
+			System.out.println(lbs);
 		}
+		*/
 	}
 	
 

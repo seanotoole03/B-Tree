@@ -10,13 +10,12 @@ import javax.xml.soap.Node;
  * @author angelsanabria , seanotoole
  *
  */
-public class BTree<T extends Comparable>
+public class BTree<T>
 {
 	private BTreeNode root, parent, current;
 	private int degree;			//position 0 of file
 	private int BTreeNodeSize, nodeMaxObj;	
 	private int rootOffset;		//position 4 of file
-	private int insert;
 	private int nodeCount; // number of nodes in tree, position 8 of file
 	private int height; // height of the BTree, position 12 of file
 	//TOTAL BTREE METADATA OFFSET = 16
@@ -32,22 +31,29 @@ public class BTree<T extends Comparable>
      * @param useCache - indicates whether the user would like a cache to be used for easier manipulation of frequently used data
      * @param cacheSize - desired size of cache (if used)
      */
-    public BTree(int degree, String fileName, boolean useCache)
+    public BTree(int degree, String fileName, int useCache, int cacheSize)
     {
-        BTreeNodeSize = 8 + (24*(degree)); //bytes -- 16 + (2t - 1)*8 + (2t)*4
+        BTreeNodeSize = 4 + (32*(degree)); //bytes -- 16 + (2t - 1)*12 + (2t)*4
         nodeMaxObj = (2*degree)-1;
         rootOffset = 16;
-        insert = 0;
         height = 0;
         nodeCount = 1;
         this.degree = degree;  
         
         file = new File(fileName);
+        
         try { 	//Initialize RandcomAccessFile reader and writer
+        	if(!file.createNewFile()) {
+        		System.out.println("Error! File not created - either already exists or an error in creation occurred.");
+        	}
         	fileRead = new RandomAccessFile(file, "r");
         	fileWrite = new RandomAccessFile(file, "rw");
         } catch (FileNotFoundException e) {
         	e.printStackTrace();
+        	System.exit(0);
+        } catch (IOException e) {
+        	e.printStackTrace();
+        	System.exit(0);
         }
         
         try {	//Metadata writing - 16 bytes in total
@@ -86,7 +92,7 @@ public class BTree<T extends Comparable>
         	if(current.getN() == nodeMaxObj) { //current node is full
         		//TODO: How should we move the loop back up to the parent node? We will need to restart search from one level up.
         		// 1 DEC - Added code to splitting child nodes to move pointers up to appropriate locations - test at meeting
-        		if(current == root) { //splitting root
+        		if(current.equals(root)) { //splitting root
         			splitRoot();
         			
         			
@@ -109,7 +115,7 @@ public class BTree<T extends Comparable>
         		
     		}
         	int i = current.getN(); //retrieve number of objects in current node
-	        while (i > 0 && obj.compareTo(current.getKey(i-1)) > 0) //search backwards to find first smaller object
+	        while (i > 0 && obj.compareTo(current.getKey(i-1)) < 0) //search backwards to find first smaller/equal object
 	        {
 	            i--; //should bring us to either 
 	        }
@@ -125,6 +131,8 @@ public class BTree<T extends Comparable>
 	        	if(current.isLeaf == 1) { //safe to add object to
 	        		//TODO: add object to arraylist at current location (i, where i == 0 and/or is correct index to insert at)
 	        		current.addKey(obj, i);
+	        		current.setN(current.getN()+1);
+	        		insertion = true;
 	        		
 	        	} else { //internal node - we need to find child node to check next, and set that to be the current node
 	        		parent = current;
@@ -183,7 +191,7 @@ public class BTree<T extends Comparable>
 	 */
 	public void splitChild(BTreeNode parent, int currIndex, BTreeNode current)// splitting will be the only time where we add pointers
 	 {
-	    BTreeNode z = new BTreeNode();	//replacement for original node - new child
+	    BTreeNode z = new BTreeNode();	//new child
 	    z.setOffset(rootOffset);
 	    rootOffset += BTreeNodeSize;
         z.setIsLeaf(current.isLeaf());
@@ -200,6 +208,8 @@ public class BTree<T extends Comparable>
         {
           z.addKey(current.removeKey(0), j); 
         }
+        current.setN(degree-1);
+        parent.setN(parent.getN()+1);
         
         if (!(current.isLeaf() == 1)) //we're splitting an internal node, children pointers should be allocated to new locations/nodes
         {
@@ -239,10 +249,12 @@ public class BTree<T extends Comparable>
           childRight.addKey(root.getKey(j + (degree)), j);
         }
 		
-		for (int j = 0; j < ((2*degree) -1); j++)
+		TreeObject mid = root.removeKey(degree-1);
+		for (int j = 0; j < ((2*degree) -2); j++)
         {
 			root.removeKey(0);
         }
+		root.addKey(mid);
         
         if (!(current.isLeaf() == 1)) //we're splitting an internal root 
         {
@@ -259,9 +271,11 @@ public class BTree<T extends Comparable>
         root.addChild(childLeft.getOffset());
         root.addChild(childRight.getOffset());
 		
-		if(root.isLeaf() == 1) {
+		if(root.isLeaf() == 1) { //if it was previously a leaf
 			root.setIsLeaf(0); 
-		} 
+		}
+		
+		root.setN(1);
 		
 		//write root's new children into file at appropriate location
 		writeNode(childLeft, childLeft.getOffset());
@@ -278,8 +292,8 @@ public class BTree<T extends Comparable>
 	public BTreeNode writeNode(BTreeNode x, int t) //node to write and degree of tree
 	{
 		try {
-			int writeLocation = baseOffset + 2*t*(x.getParent() + BTreeNodeSize);
-			fileWrite.seek(writeLocation); //should write at (BTree Offset) + 2*t*((parent pointer) + (node size))
+			
+			fileWrite.seek(x.getOffset()); 
 			/*
 			 * Order of write:
 			 * 1. Number of objects (int)
@@ -297,7 +311,7 @@ public class BTree<T extends Comparable>
 				fileWrite.writeLong(x.getKey(i).getKey());		//key for object
 				fileWrite.writeInt(x.getKey(i).getFrequency());	//frequency of object
 			}
-			fileWrite.seek(writeLocation + 16 + ((2*t) -1)*12); //move to start location of child pointer array
+			fileWrite.seek(x.getOffset() + 16 + ((2*t) -1)*12); //move to start location of child pointer array
 																//start of node + metadata + size of TreeObject array
 			if(x.isLeaf() == 0) { //internal node, has pointers to track
 				for(int i = 0; i < (x.getN() + 1); i++) { //could use getChildren.size(), but this should always be accurate, and better reflects desired behavior
@@ -337,7 +351,7 @@ public class BTree<T extends Comparable>
 			node.setIsLeaf(fileRead.readInt()); //should now be 16 bytes in
 			TreeObject obj = new TreeObject(0,0);
 			for(int i = 0; i < node.getN(); i ++) {
-				obj.setKey( fileRead.readLong() );
+				obj.setKey( fileRead.readLong() ); //long will not be in binary format
 				obj.setFrequency(fileRead.readInt());
 				node.addKey(obj, i);
 			}
@@ -353,6 +367,64 @@ public class BTree<T extends Comparable>
 		}
 		
 		return node;
+	}
+	
+	//Tree traversal - create dump file
+	public void treeTraverseDump(File outFile, int seqLength) {
+		FileWriter write = null;
+		try {
+			write = new FileWriter(outFile);
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.exit(0);
+		}
+		
+		BTreeNode traverseParent = root;
+		BTreeNode traverseChild = root;
+		inOrder(traverseChild, traverseParent, write, seqLength);
+	}
+	
+	/**
+	 * In order traversal of tree, writing all values to dump file.
+	 * @param childNode
+	 * @param parentNode
+	 * @param write
+	 * @param seqLength
+	 */
+	public void inOrder(BTreeNode childNode, BTreeNode parentNode, FileWriter write, int seqLength) {
+		try {
+			for(int i = 0; i < childNode.getKeys().size(); i++) {
+				if(childNode.isLeaf() != 1) {
+					inOrder(readNode(childNode.getChild(i)), childNode, write, seqLength);
+				}
+				
+				TreeObject t = childNode.getKey(i);
+				write.write(t.toDNAString(seqLength) + "\t:\t" + t.getFrequency()); // sequence, tab, colon, tab, frequency
+				
+				if(i == (childNode.getKeys().size()-1) && childNode.isLeaf != 1) {
+					inOrder(readNode(childNode.getChild(i+1)), childNode, write, seqLength);
+				}
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.exit(0);
+		}
+	}
+	
+	/**
+	 * Returns the root node.
+	 * @return root node
+	 */
+	public BTreeNode getRoot() {
+		return root;
+	}
+	
+	/**
+	 * Returns current root offset, the current endpoint for the file.
+	 * @return current offset.
+	 */
+	public int getOffset() {
+		return rootOffset;
 	}
 	
 	/**
@@ -511,6 +583,10 @@ public class BTree<T extends Comparable>
 			    {
 			        TreeObject obj = keys.get(k);
 			        return obj;
+			    }
+			    
+			    public ArrayList<TreeObject> getKeys(){
+			    	return keys;
 			    }
 			    
 			    /**
