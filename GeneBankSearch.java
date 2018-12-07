@@ -1,21 +1,23 @@
 import java.io.File;
 import java.io.RandomAccessFile;
+import java.util.ArrayList;
 import java.util.Scanner;
 
 /**
- * This class searches in a specified BTree
- * for sequences for given length
+ * This is a driver Class for searching a GeneBank generated BTree for
+ * a list of query sequences.
  * 
  * @author angelsanabria
  *
  */
 public class GeneBankSearch 
 {
-	private static boolean useCache = false;
+	private static int useCache;
 	private static String btreeFile; 
 	private static String queryFile;
 	private static int cacheSize; 
 	private static int debugLevel = 0;
+	private static TreeObject object;
 
 	public static void main(String[] args) 
 	{
@@ -30,7 +32,7 @@ public class GeneBankSearch
 		// This if statement determines whether to use a cache or not
 		if (args[0].equals("1")) 
 		{
-			useCache = true; //use BTree with cache
+			useCache = 1; //use BTree with cache
 		}
 		
 		else if (!(args[0].equals("0") || args[0].equals("1"))) 
@@ -39,10 +41,10 @@ public class GeneBankSearch
 		}
 
 		btreeFile = args[1]; //BTree File
-		queryFile = args[2]; //Query File
+		queryFile = args[2]; //Query File 
 
 		//This if statement checks the size of the cache if there are at least 4 arguments
-		if (useCache && args.length >= 4) 
+		if (useCache == 1 && args.length >= 4) 
 		{
 			cacheSize = Integer.parseInt(args[3]);
 		}
@@ -52,7 +54,8 @@ public class GeneBankSearch
 			debugLevel = Integer.parseInt(args[4]);
 
 		//find degree and sequence length
-		String seq = "", deg = "";
+		String seq = "";
+		String deg = "";
 
 		//finds the degree of the btree file
 		for(int i = btreeFile.length()-1; i >= 0; i--) 
@@ -77,19 +80,22 @@ public class GeneBankSearch
 		//System.out.println("degree: " + degree);
 		//System.out.println("sequence length: " + sequence);
 		
+		
+		//searching in the specified BTree for sequences of given length. The search program
+		//assumes that the user specified the proper BTree to use depending upon the query length.
 		try {
-			SequenceReader gbc = new SequenceReader();
-			BTree tree = new BTree(degree, btreeFile, useCache, cacheSize);
+			SequenceReader gbc = new SequenceReader(queryFile, sequence);
+			BTree tree = new BTree(degree, btreeFile, useCache, cacheSize); 
 			Scanner scan = new Scanner(new File(queryFile));
 			
 			while(scan.hasNext()) {
-				String query = scan.nextLine(); //sequence to search for
+				String query = scan.nextLine(); //sequence to search for binary 
 				
-				long q = gbc.readSubSequence((RandomAccessFile)query); // trying to read the sequence of the frequency of the object 
-				TreeObject result = tree.search(tree.readNode(sequence), q); //result should have key and frequency
+				long frequency = Long.parseLong(query,2); // trying to read the frequency of the object 
+				TreeObject result = tree.search(tree.readNode(sequence), frequency); //result should have key and frequency
 				
 				if(result != null) 
-					System.out.println(Integer.parseInt(seq)+": "+ result.getFrequency());
+					System.out.println(Long.parseLong(result.toDNAString(sequence))+Integer.parseInt(seq)+": "+ result.getFrequency());
 			}
 			
 			scan.close();
