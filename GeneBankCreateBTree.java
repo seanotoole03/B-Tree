@@ -73,9 +73,11 @@ public class GeneBankCreateBTree {
 		if(debug == 1) { //dump file should be created
 			outFile = new File("dump");
 			try {
-				if(!outFile.createNewFile()) {
-					System.out.println("File creation error!");
-				};
+				outFile.delete();
+				outFile.createNewFile(); //returns a boolean, but we don't care about its value
+//				if(!outFile.createNewFile()) {
+//					System.out.println("File creation error!");
+//				};
 			} catch (IOException e) {
 				e.printStackTrace();
 			}
@@ -90,9 +92,8 @@ public class GeneBankCreateBTree {
 	 * Return the optimal degree for this BTree and disk block size of 4096
 	 * @return
 	 */
-	public static int optimalDegree() { //TODO: this
-		int t = 0;
-		return ((4096 - 16) / (16 + (12*t) + 4*(2*t)) );
+	public static int optimalDegree() { //TODO: test this
+		return ( (4096 - 16 + 12) / (32) );
 	}
 
 	public static void main(String[] args) { //should parse all 4-6 arguments, run CreateTree method as appropriate

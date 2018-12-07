@@ -1,4 +1,5 @@
 import java.io.*;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedList;
@@ -8,7 +9,6 @@ import javax.xml.soap.Node;
  * This class
  * 
  * @author angelsanabria , seanotoole
- * cache implementation by Stephen Richardson
  *
  */
 public class BTree<T>
@@ -23,8 +23,6 @@ public class BTree<T>
 	private int baseOffset = 16;
 	private File file;
     private RandomAccessFile fileRead, fileWrite;
-    private BTreeCache cache;
-    private int cacheSize;
    
     /**
      * Constructor for BTree - includes cache usage.
@@ -74,35 +72,10 @@ public class BTree<T>
         root.setParent(0);
         root.setIsLeaf(1); //New tree should have a root that is a leaf.
         
-        //CACHE IMPLEMENTATION NOTES//
+        //TODO: Implement cache functionality
         
-        /*when using cache, if something is found, cache will return the entire node.
-        otherwise it will return null.
         
-        if a node is returned, once any changes have been made, before writing to the 
-        file, call cache.replaceFirst(NodeWeChanged);
         
-        if null was found, it means no matching nodes are in cache, so normal search
-        is used. once node is found and changed, before writing to the file
-        call cache.addObject(Node we changed/made);
-        */
-    }
-    
-    //initializing the cache, to be called from the search and create driver classes
-    public void initCache(int maxSize)
-    {
-    	//create new cache if it doesn't exist
-    	if (cache == null)
-    	{
-			cacheSize = maxSize;
-			cache = new BTreeCache(cacheSize);
-    	}
-    	//otherwise clear the existing cache and reset maxSize
-    	else
-    	{
-    		cache.clearCache();
-    		cache.maxSize = maxSize;
-    	}
     }
     
 	/**
@@ -125,7 +98,12 @@ public class BTree<T>
         			
         			
         		} else { //splitting standard node, should split around center (degree)
-        			splitChild(parent, degree, current);
+        			int currIndex = degree-1, i = 0;
+        			ArrayList<Integer> childArray = parent.getChildren();
+        			for(i = 0; i < childArray.size() && childArray.get(i) != current.getOffset(); i++);
+        			if(childArray.get(i) == current.getOffset()) currIndex = i; //find correct current index in parent child array/insertion point for parent new key
+        			//error check here?
+        			splitChild(parent, currIndex, current);
         			
         			//move up to parent to resume search/insert, check first if moving up to root to prevent reading from invalid location
         			if(parent == root) {
@@ -151,15 +129,17 @@ public class BTree<T>
 	        if (i > 0 && obj.compareTo(current.getKey(i-1)) == 0) //found exact sequence in current node
 	        {
 	            current.getKey(i-1).increaseFrequency(); //increment frequency of sequence, rather than create duplicates
+	            writeNode(current, degree);
 	            insertion = true;
 	        }
 	        
 	        else 	//either i == 0, indicating this is smaller than anything in the array, or current.getKey(i-1) < obj.g 
 	        {		//either way, we will need to either insert the object in a child node, or in this node, if it is a leaf
 	        	if(current.isLeaf == 1) { //safe to add object to
-	        		//TODO: add object to arraylist at current location (i, where i == 0 and/or is correct index to insert at)
+	        		//add object to arraylist at current location (i, where i == 0 and/or is correct index to insert at)
 	        		current.addKey(obj, i);
 	        		current.setN(current.getN()+1);
+	        		writeNode(current, degree);
 	        		insertion = true;
 	        		
 	        	} else { //internal node - we need to find child node to check next, and set that to be the current node
@@ -228,19 +208,24 @@ public class BTree<T>
         z.setIsLeaf(current.isLeaf());
         z.setParent(current.getParent());
         if(current.getParent() == 0) { 	//parent is root
-        	root.addKey(current.removeKey(degree-1), currIndex); 		//grab middle object, push up to parent
+        	root.addKey(current.removeKey(degree-1), currIndex); 		//grab middle object, push up to parent and adjust subsequent child array items right
         	root.addChild(z.getOffset(), currIndex);
         } else { 
-        	parent.addKey(current.removeKey(degree-1), currIndex); 		//grab middle object, push up to parent
+        	parent.addKey(current.removeKey(degree-1), currIndex); 		//grab middle object, push up to parent and adjust subsequent child array items right
         	parent.addChild(z.getOffset(), currIndex);
         }
         z.setN(degree-1);
         for (int j = 0; j < (degree - 1); j++) 	//pass front half of values in array to new node
         {
           z.addKey(current.removeKey(0), j); 
-        }
+        } 
+        //remaining values in current should only be second half of array, as middle value and right half have been removed
         current.setN(degree-1);
-        parent.setN(parent.getN()+1);
+        if(current.getParent() == 0) { 	//parent is root
+        	root.setN(root.getN()+1);
+        } else { 
+            parent.setN(parent.getN()+1);
+        }
         
         if (!(current.isLeaf() == 1)) 	//we're splitting an internal node, children pointers should be allocated to new locations/nodes
         {
@@ -250,9 +235,13 @@ public class BTree<T>
             }
         }
         //update/add nodes in file appropriately
-        writeNode(parent, parent.getOffset());
-        writeNode(current, current.getOffset());
-        writeNode(z, z.getOffset());
+        if(parent != root) {
+        	writeNode(parent, degree);
+        }
+        
+        writeNode(current, degree);
+        writeNode(z, degree);
+        nodeCount++;
         return;
 	 }
 	
@@ -280,7 +269,7 @@ public class BTree<T>
           childRight.addKey(root.getKey(j + (degree)), j);
         }
 		
-		TreeObject mid = root.removeKey(degree-1);
+		TreeObject mid = root.removeKey(degree-1); //remove middle 
 		for (int j = 0; j < ((2*degree) -2); j++)
         {
 			root.removeKey(0);
@@ -298,10 +287,26 @@ public class BTree<T>
             	root.removeChild(0);
             }
         }
-		
+        
+		//add new children to root
         root.addChild(childLeft.getOffset());
         root.addChild(childRight.getOffset());
+        
+        //update old children of root to point at new parents
+        ArrayList<Integer> childArrays = childLeft.getChildren();
+        for(int i = 0; i < childLeft.getChildren().size(); i++) {
+        	current = readNode(childArrays.get(i));
+        	current.setParent(childLeft.getOffset());
+        }
+        childArrays = childRight.getChildren();
+        for(int i = 0; i < childRight.getChildren().size(); i++) {
+        	current = readNode(childArrays.get(i));
+        	current.setParent(childRight.getOffset());
+        }
 		
+        //reset current to root
+        current = root;
+        
 		if(root.isLeaf() == 1) { //if it was previously a leaf
 			root.setIsLeaf(0); 
 		}
@@ -309,8 +314,9 @@ public class BTree<T>
 		root.setN(1);
 		
 		//write root's new children into file at appropriate location
-		writeNode(childLeft, childLeft.getOffset());
-		writeNode(childRight, childRight.getOffset());
+		writeNode(childLeft, degree);
+		writeNode(childRight, degree);
+		nodeCount+=2;
 		
 		return;
 	}
@@ -322,8 +328,12 @@ public class BTree<T>
 	 */
 	public BTreeNode writeNode(BTreeNode x, int t) //node to write and degree of tree
 	{
+		ByteBuffer buff = ByteBuffer.allocate(BTreeNodeSize);
 		try {
-			
+			buff.putInt(x.getN());
+			buff.putInt(x.getOffset());
+			buff.putInt(x.getParent());
+			buff.putInt(x.isLeaf());
 			fileWrite.seek(x.getOffset()); 
 			/*
 			 * Order of write:
@@ -334,21 +344,28 @@ public class BTree<T>
 			 * 5. Iterate through key array to N-1 (key - long, frequency - int)
 			 * 6. If NOT leaf, iterate through child array to (N+1) (int)
 			 */
-			fileWrite.writeInt(x.getN());
-			fileWrite.writeInt(x.getOffset());
-			fileWrite.writeInt(x.getParent());
-			fileWrite.writeInt(x.isLeaf());
+//			fileWrite.writeInt(x.getN());
+//			fileWrite.writeInt(x.getOffset());
+//			fileWrite.writeInt(x.getParent());
+//			fileWrite.writeInt(x.isLeaf());
 			for(int i = 0; i < x.getN(); i++) { // only write as many objects as should currently be stored
-				fileWrite.writeLong(x.getKey(i).getKey());		//key for object
-				fileWrite.writeInt(x.getKey(i).getFrequency());	//frequency of object
+//				fileWrite.writeLong(x.getKey(i).getKey());		//key for object
+//				fileWrite.writeInt(x.getKey(i).getFrequency());	//frequency of object
+				buff.putLong(x.getKey(i).getKey());
+				buff.putInt(x.getKey(i).getFrequency());
 			}
-			fileWrite.seek(x.getOffset() + 16 + ((2*t) -1)*12); //move to start location of child pointer array
+//			fileWrite.seek(x.getOffset() + 16 + ((2*t) -1)*12); //move to start location of child pointer array
 																//start of node + metadata + size of TreeObject array
+			int newPos = 16 + ((2*t) -1)*12;
+			buff.position(newPos);
+			
 			if(x.isLeaf() == 0) { //internal node, has pointers to track
 				for(int i = 0; i < (x.getN() + 1); i++) { //could use getChildren.size(), but this should always be accurate, and better reflects desired behavior
-					fileWrite.writeInt(x.getChildren().get(i));
+//					fileWrite.writeInt(x.getChildren().get(i));
+					buff.putInt(x.getChildren().get(i));
 				}
 			}
+			fileWrite.write(buff.array());
 			fileWrite.seek(0); //reset fileWrite for next use
 		} catch (IOException e) {
 			System.out.println("File Writing Error!");
@@ -365,8 +382,13 @@ public class BTree<T>
 	 */
 	public BTreeNode readNode(int location) { //should we be using a long to read from file? Int will accomodate up to a 2 GB tree...
 		BTreeNode node = new BTreeNode();
+		byte[] bytes = new byte[BTreeNodeSize];
+		ByteBuffer buffer = ByteBuffer.allocate(BTreeNodeSize);
 		try {
 			fileRead.seek(location);
+			fileRead.read(bytes);
+			buffer = ByteBuffer.wrap(bytes);
+			buffer.position(0);
 			/*
 			 * Order of read:
 			 * 1. Number of objects (int)
@@ -376,20 +398,22 @@ public class BTree<T>
 			 * 5. Iterate through key array to N-1 (key - long, frequency - int)
 			 * 6. If NOT leaf, iterate through child array to (2*N - 1) (int)
 			 */
-			node.setN(fileRead.readInt());
-			node.setOffset(fileRead.readInt());
-			node.setParent(fileRead.readInt());
-			node.setIsLeaf(fileRead.readInt()); //should now be 16 bytes in
-			TreeObject obj = new TreeObject(0,0);
-			for(int i = 0; i < node.getN(); i ++) {
-				obj.setKey( fileRead.readLong() ); //long will not be in binary format
-				obj.setFrequency(fileRead.readInt());
+			node.setN(buffer.getInt());
+			node.setOffset(buffer.getInt());
+			node.setParent(buffer.getInt());
+			node.setIsLeaf(buffer.getInt()); //should now be 16 bytes in
+			
+			for(int i = 0; i < node.getN(); i++) {
+				TreeObject obj = new TreeObject(0,0);
+				obj.setKey(buffer.getLong()); //long will not be in binary format
+				obj.setFrequency(buffer.getInt());
 				node.addKey(obj, i);
 			}
-			fileRead.seek(location + 16 + ((2*degree)-1)*12); //seek end of TreeObject array
+			//fileRead.seek(location + 16 + ((2*degree)-1)*12); //seek end of TreeObject array
+			buffer.position(16 + ((2*degree)-1)*12);
 			if(node.isLeaf() == 0) { //internal node, should have child pointers
 				for(int i = 0; i < (node.getN() + 1); i ++) {
-					node.addChild(fileRead.readInt(), i);
+					node.addChild(buffer.getInt(), i);
 				}
 			}
 			fileRead.seek(0);
@@ -402,9 +426,9 @@ public class BTree<T>
 	
 	//Tree traversal - create dump file
 	public void treeTraverseDump(File outFile, int seqLength) {
-		FileWriter write = null;
+		RandomAccessFile writeDump = null;
 		try {
-			write = new FileWriter(outFile);
+			writeDump = new RandomAccessFile(outFile, "rw");
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.exit(0);
@@ -412,7 +436,7 @@ public class BTree<T>
 		
 		BTreeNode traverseParent = root;
 		BTreeNode traverseChild = root;
-		inOrder(traverseChild, traverseParent, write, seqLength);
+		inOrder(traverseChild, traverseParent, writeDump, seqLength);
 	}
 	
 	/**
@@ -422,7 +446,7 @@ public class BTree<T>
 	 * @param write
 	 * @param seqLength
 	 */
-	public void inOrder(BTreeNode childNode, BTreeNode parentNode, FileWriter write, int seqLength) {
+	public void inOrder(BTreeNode childNode, BTreeNode parentNode, RandomAccessFile write, int seqLength) {
 		try {
 			for(int i = 0; i < childNode.getKeys().size(); i++) {
 				if(childNode.isLeaf() != 1) {
@@ -430,7 +454,7 @@ public class BTree<T>
 				}
 				
 				TreeObject t = childNode.getKey(i);
-				write.write(t.toDNAString(seqLength) + "\t:\t" + t.getFrequency()); // sequence, tab, colon, tab, frequency
+				write.writeChars(t.toDNAString(seqLength) + ':' + ' ' + t.getFrequency() + '\n'); // sequence, tab, colon, tab, frequency
 				
 				if(i == (childNode.getKeys().size()-1) && childNode.isLeaf != 1) {
 					inOrder(readNode(childNode.getChild(i+1)), childNode, write, seqLength);
@@ -440,6 +464,7 @@ public class BTree<T>
 			e.printStackTrace();
 			System.exit(0);
 		}
+		return;
 	}
 	
 	/**

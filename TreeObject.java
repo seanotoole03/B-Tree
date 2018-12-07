@@ -106,16 +106,16 @@ public class TreeObject implements Comparable<TreeObject>
 			str = "0" + str;
 		}
 		//should create a string of sequenceLength using binary string created
-		for(int i = (64 - 2*seqLength); i < 62; i += 2) {
+		for(int i = (64 - 2*seqLength); i < 64; i += 2) {
 			String bits = str.substring(i, i+2);
 			if(bits.equals("00")) {
-				ret += "a";
+				ret += 'a';
 			} else if(bits.equals("11")) {
-				ret += "t";
+				ret += 't';
 			} else if(bits.equals("01")) {
-				ret += "c";
+				ret += 't';
 			} else { //bits.equals("10")
-				ret += "g";
+				ret += 'g';
 			}
 		}
 		return ret;
