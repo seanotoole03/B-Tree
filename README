@@ -1,0 +1,92 @@
+// Sean O'Toole, Stephen Richardson, Angel Sanabria
+// CS 321
+// Program 4
+// 12/7/2018
+
+Included files:
+  BTree.java - Implementation of B-Tree specialized for this project and there is an
+  	inner class called BTreeNode that creates BTreeNodes.
+  	
+  BTreeCache.java - Cache used by BTree.java
+  
+  GeneBankCreateBTree.java - Main class for GeneBankCreateBTree program; creates
+    a BTree from a .gbk file
+    
+  GeneBankSearch.java - Main class for GeneBankSearch program; searches a BTree
+    file created by GeneBankCreateBTree for sequences specified in a query file
+    
+  README - In depth file talking about the project
+  
+  TreeObject.java - Object class used by BTree.java
+  
+  SequenceReader.java - A class that reads the sequence and is used by GeneBankSearch and
+  	GeneBankCreateBTree
+  	
+  DNA.java - given file for creating the bases of the DNA sequence
+  
+  QueryGenerator.java - Creates random DNA sequences from a given length and will
+  	generate a given amount of queries
+  	
+  RandomAccessFileTest.java - This is a testing class that checks to see how RandomAccessFile
+  	works in java.
+
+Compiling and running:
+  Compiling:
+    javac *.java
+
+  Running GeneBankCreateBTree:
+    java GeneBankCreateBTree <cache> <degree> <gbk file> <sequence length> [<cache size>] [<debug level>]
+
+    <cache>: 1 to use a cache, 0 to use no cache.
+    <degree>: Degree to use for the BTree. If 0, the default degree (optimal for
+      block size 4096) is used.
+    <gbk file>: .gbk file to create a BTree from.
+    <sequence length>: Length of gene sequences to store in the BTree.
+    <cache size>: Size of the cache (maximum number of nodes to store).(optional parameter)
+    <debug level>: 1 to write a dump of the BTree data to a file named "dump". 0(optional parameter)
+      to not write a dump.
+
+    GeneBankCreateBTree will create a BTree file in the same directory as the
+    gbk file with the naming format:
+      <gbk filename>.btree.data.<sequence length>.<degree>
+
+  Running GeneBankSearch:
+    To run GeneBankSearch you need a finished BTree file as created by
+    GeneBankCreateBTree. The sequence length in the BTree should be the same as
+    the sequence length you are searching for.
+
+    java GeneBankSearch <cache> <btree file> <query file> [<cache size>] [<debug level>]
+
+    <cache>: 1 to use a cache, 0 to use no cache.
+    <btree file>: Filename of the BTree file to search.
+    <query file>: Filename of the query file to use.
+    <cache size>: Size of the cache (maximum number of nodes to store).(optional parameter)
+    <debug level>: If included, must be an integer. Currently has no effect.(optional parameter)
+
+    GeneBankSearch will print a summary of the search results showing how many
+    times each sequence was found.
+
+BTree File description:
+
+The first thing the BTree does is it writes its metadata to the disk. The metadata of 
+a btree is its' degree, rootOffset, number of nodes in the tree, and the height of the tree.
+There is a variable in the BTree that keeps track of where to insert which 
+increments each time a node is inserted. When each node is written, the BTree 
+writes the node's metadata first. The node's metadata is whether or not the node
+is a leaf, number of objects in the node, and a parent and offset pointer. 
+Each BTreeNode holds on to a number of data:
+An ArrayList of child pointers (offsets in the file), an ArrayList of 
+TreeObjects, the offset of the parent and its own offset. 
+When the BTree writes a node, it first writes the 16 bytes of metadata. Following this,
+it writes the full array of TreeObjects currently held, then jumps to the location for
+writing child pointers and writes through that entire array. The BTree just writes 
+zeroes in the unused places (although again, it could be any invalid number). 
+There are two scenarios to consider when writing the nodes to disk. The first 
+scenario is that we are splitting the root. When we split the root we are 
+getting three nodes from one node so we create a new node, move the last t-1 
+keys to it, move the medium key up to the new root, move children if the old 
+root wasn't a leaf node, then write the new node, the new root and the old root 
+to disk. The second scenario is that we are splitting a node that is
+not the root. We are only creating one new node. The new node gets the split 
+node's last t-1 keys. The parent of the split node gets its medium key. We move
+children if necessary then write the nodes back.
