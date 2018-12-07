@@ -96,12 +96,13 @@ public class BTree<T>
         		if(current.equals(root)) { //splitting root
         			splitRoot();
         			
-        			
         		} else { //splitting standard node, should split around center (degree)
         			int currIndex = degree-1, i = 0;
         			ArrayList<Integer> childArray = parent.getChildren();
-        			for(i = 0; i < childArray.size() && childArray.get(i) != current.getOffset(); i++);
-        			if(childArray.get(i) == current.getOffset()) currIndex = i; //find correct current index in parent child array/insertion point for parent new key
+        			while(!childArray.get(i).equals(current.getOffset())) {
+        				i++;
+        			}
+        			currIndex = i;
         			//error check here?
         			splitChild(parent, currIndex, current);
         			
@@ -114,7 +115,9 @@ public class BTree<T>
         			} else { //standard internal or leaf node at least 2 levels deep
         				current = parent;
         				parent = readNode(parent.getParent()); //read parent from file
+
         			}
+        			
         		}
         		
         		continue; //end current loop, resume search/insert 
@@ -207,7 +210,7 @@ public class BTree<T>
 	    rootOffset += BTreeNodeSize;
         z.setIsLeaf(current.isLeaf());
         z.setParent(current.getParent());
-        if(current.getParent() == 0) { 	//parent is root
+        if(current.getParent() == 0 && parent == root) { 	//parent is root
         	root.addKey(current.removeKey(degree-1), currIndex); 		//grab middle object, push up to parent and adjust subsequent child array items right
         	root.addChild(z.getOffset(), currIndex);
         } else { 
@@ -221,7 +224,7 @@ public class BTree<T>
         } 
         //remaining values in current should only be second half of array, as middle value and right half have been removed
         current.setN(degree-1);
-        if(current.getParent() == 0) { 	//parent is root
+        if(current.getParent() == 0 && parent == root) { 	//parent is root
         	root.setN(root.getN()+1);
         } else { 
             parent.setN(parent.getN()+1);
@@ -232,15 +235,20 @@ public class BTree<T>
             for (int j = 0; j < degree; j++)
             {
                 z.addChild(current.removeChild(0), j);
+                BTreeNode temp = readNode(z.getChild(j));
+                temp.setParent(z.getOffset());
+                writeNode(temp, degree);
             }
         }
         //update/add nodes in file appropriately
-        if(parent != root) {
+        if(this.parent != root) {
         	writeNode(parent, degree);
+        	this.parent = readNode(parent.getOffset());
         }
         
         writeNode(current, degree);
         writeNode(z, degree);
+        this.current = readNode(current.getOffset());
         nodeCount++;
         return;
 	 }
@@ -297,15 +305,17 @@ public class BTree<T>
         for(int i = 0; i < childLeft.getChildren().size(); i++) {
         	current = readNode(childArrays.get(i));
         	current.setParent(childLeft.getOffset());
+        	writeNode(current, degree);
         }
         childArrays = childRight.getChildren();
         for(int i = 0; i < childRight.getChildren().size(); i++) {
         	current = readNode(childArrays.get(i));
         	current.setParent(childRight.getOffset());
+        	writeNode(current, degree);
         }
 		
         //reset current to root
-        current = root;
+        current = parent = root;
         
 		if(root.isLeaf() == 1) { //if it was previously a leaf
 			root.setIsLeaf(0); 
@@ -360,9 +370,10 @@ public class BTree<T>
 			buff.position(newPos);
 			
 			if(x.isLeaf() == 0) { //internal node, has pointers to track
+				ArrayList<Integer> children = x.getChildren();
 				for(int i = 0; i < (x.getN() + 1); i++) { //could use getChildren.size(), but this should always be accurate, and better reflects desired behavior
 //					fileWrite.writeInt(x.getChildren().get(i));
-					buff.putInt(x.getChildren().get(i));
+					buff.putInt(children.get(i));
 				}
 			}
 			fileWrite.write(buff.array());
@@ -484,6 +495,13 @@ public class BTree<T>
 	}
 	
 	/**
+	 * 
+	 * @return current node count
+	 */
+	public int getNodeCount() {
+		return nodeCount;
+	}
+	/**
 	 * Size() method for BTree
 	 * 
 	 * @return current number of nodes
@@ -563,6 +581,7 @@ public class BTree<T>
 			    }
 			    
 			    /**
+			     * Appends to end of ArrayList
 			     * @param address of a child node to be added to child array
 			     */
 			    public void addChild(int address)
@@ -571,8 +590,9 @@ public class BTree<T>
 			    }
 			    
 			    /**
-			     * @param x
-			     * @param i
+			     * Inserts at index, shifting all subsequent children right
+			     * @param x - address of new child
+			     * @param i - index to add at
 			     */
 			    public void addChild(int x, int i)
 			    {
@@ -596,7 +616,7 @@ public class BTree<T>
 			     */
 			    public int getChild(int i)
 			    {
-			        return children.get(i).intValue();
+			        return children.get(i);
 			    }
 			    
 			    /**
@@ -610,7 +630,7 @@ public class BTree<T>
 			    }
 			    
 			    /**
-			     * This method gets the number of objects in the BTree
+			     * This method gets the number of objects in the node
 			     * 
 			     * @return
 			     */
@@ -620,7 +640,7 @@ public class BTree<T>
 			    }
 			    
 			    /**
-			     * This method sets the number of objects in the BTree
+			     * This method sets the number of objects in the node
 			     * 
 			     * @param i
 			     */
@@ -646,8 +666,7 @@ public class BTree<T>
 			    }
 			    
 			    /**
-			     * 
-			     * 
+			     * Appends new key to end of list
 			     * @param obj
 			     */
 			    public void addKey(TreeObject obj)
@@ -656,6 +675,7 @@ public class BTree<T>
 			    }
 			    
 			    /**
+			     * Adds key at index i, shifts all subsequent values right
 			     * @param obj
 			     * @param i
 			     */
