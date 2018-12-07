@@ -84,7 +84,7 @@ public class GeneBankSearch
 		//searching in the specified BTree for sequences of given length. The search program
 		//assumes that the user specified the proper BTree to use depending upon the query length.
 		try {
-			SequenceReader gbc = new SequenceReader(queryFile, sequence);
+			SequenceReader src = new SequenceReader(queryFile, sequence);
 			BTree tree = new BTree(degree, btreeFile, useCache, cacheSize); 
 			Scanner scan = new Scanner(new File(queryFile));
 			
@@ -92,7 +92,7 @@ public class GeneBankSearch
 				String query = scan.nextLine(); //sequence to search for binary 
 				
 				long frequency = Long.parseLong(query,2); // trying to read the frequency of the object 
-				TreeObject result = tree.search(tree.readNode(sequence), frequency); //result should have key and frequency
+				TreeObject result = tree.search(tree.getRoot(), frequency); //result should have root and frequency
 				
 				if(result != null) 
 					System.out.println(Long.parseLong(result.toDNAString(sequence))+Integer.parseInt(seq)+": "+ result.getFrequency());
