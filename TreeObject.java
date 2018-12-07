@@ -113,7 +113,7 @@ public class TreeObject implements Comparable<TreeObject>
 			} else if(bits.equals("11")) {
 				ret += 't';
 			} else if(bits.equals("01")) {
-				ret += 't';
+				ret += 'c';
 			} else { //bits.equals("10")
 				ret += 'g';
 			}

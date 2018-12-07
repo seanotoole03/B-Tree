@@ -24,6 +24,7 @@ public class BTree<T>
 	private File file;
     private RandomAccessFile fileRead, fileWrite;
    
+    private int tester = 0;
     /**
      * Constructor for BTree - includes cache usage.
      * 
@@ -44,9 +45,8 @@ public class BTree<T>
         file = new File(fileName);
         
         try { 	//Initialize RandcomAccessFile reader and writer
-        	if(!file.createNewFile()) {
-        		System.out.println("Error! File not created - either already exists or an error in creation occurred.");
-        	}
+        	file.delete();
+        	file.createNewFile();
         	fileRead = new RandomAccessFile(file, "r");
         	fileWrite = new RandomAccessFile(file, "rw");
         } catch (FileNotFoundException e) {
@@ -132,7 +132,9 @@ public class BTree<T>
 	        if (i > 0 && obj.compareTo(current.getKey(i-1)) == 0) //found exact sequence in current node
 	        {
 	            current.getKey(i-1).increaseFrequency(); //increment frequency of sequence, rather than create duplicates
-	            writeNode(current, degree);
+	            if(current != root) {
+	            	writeNode(current, degree);
+	            }
 	            insertion = true;
 	        }
 	        
@@ -142,12 +144,29 @@ public class BTree<T>
 	        		//add object to arraylist at current location (i, where i == 0 and/or is correct index to insert at)
 	        		current.addKey(obj, i);
 	        		current.setN(current.getN()+1);
-	        		writeNode(current, degree);
+	        		if(current != root) {
+	        			writeNode(current, degree);
+	        		}
 	        		insertion = true;
 	        		
 	        	} else { //internal node - we need to find child node to check next, and set that to be the current node
 	        		parent = current;
 	        		current = readNode(current.getChild(i));
+	        		/*try {
+						fileRead.seek(0);
+						System.out.println(fileRead.readInt());
+						fileRead.seek(0);
+					} catch (IOException e) {
+						e.printStackTrace();
+					}*/
+	        		/*
+	        		tester++;
+	        		if(tester == 580) {
+	        			getRoot();
+	        			
+	        			
+	        		}
+	        		*/
 	        	}
 	        	
 	        	//process should repeat itself until match found or object inserted
@@ -203,52 +222,55 @@ public class BTree<T>
 	 * @param currIndex
 	 * @param current
 	 */
-	public void splitChild(BTreeNode parent, int currIndex, BTreeNode current)	// splitting will be the only time where we add pointers
+	public void splitChild(BTreeNode parentNode, int currIndex, BTreeNode currentNode)	// splitting will be the only time where we add pointers
 	 {
 	    BTreeNode z = new BTreeNode();	//new child
 	    z.setOffset(rootOffset);
 	    rootOffset += BTreeNodeSize;
-        z.setIsLeaf(current.isLeaf());
-        z.setParent(current.getParent());
-        if(current.getParent() == 0 && parent == root) { 	//parent is root
-        	root.addKey(current.removeKey(degree-1), currIndex); 		//grab middle object, push up to parent and adjust subsequent child array items right
+        z.setIsLeaf(currentNode.isLeaf());
+        z.setParent(currentNode.getParent());
+        
+        if(currentNode.getParent() == 0 && parent == root && parentNode == root) { 	//parent is root
+        	root.addKey(currentNode.removeKey(degree-1), currIndex); 		//grab middle object, push up to parent and adjust subsequent child array items right
         	root.addChild(z.getOffset(), currIndex);
         } else { 
-        	parent.addKey(current.removeKey(degree-1), currIndex); 		//grab middle object, push up to parent and adjust subsequent child array items right
-        	parent.addChild(z.getOffset(), currIndex);
+        	parentNode.addKey(currentNode.removeKey(degree-1), currIndex); 		//grab middle object, push up to parent and adjust subsequent child array items right
+        	parentNode.addChild(z.getOffset(), currIndex);
         }
+        
         z.setN(degree-1);
         for (int j = 0; j < (degree - 1); j++) 	//pass front half of values in array to new node
         {
-          z.addKey(current.removeKey(0), j); 
+          z.addKey(currentNode.removeKey(0), j); 
         } 
-        //remaining values in current should only be second half of array, as middle value and right half have been removed
-        current.setN(degree-1);
-        if(current.getParent() == 0 && parent == root) { 	//parent is root
+        
+        //remaining values in current should only be second half of array, as middle value and left half have been removed
+        currentNode.setN(degree-1);
+        if(currentNode.getParent() == 0 && parent == root && parentNode == root) { 	//parent is root
         	root.setN(root.getN()+1);
         } else { 
-            parent.setN(parent.getN()+1);
+            parentNode.setN(parentNode.getN()+1);
         }
         
-        if (!(current.isLeaf() == 1)) 	//we're splitting an internal node, children pointers should be allocated to new locations/nodes
+        if (!(currentNode.isLeaf() == 1)) 	//we're splitting an internal node, children pointers should be allocated to new locations/nodes
         {
             for (int j = 0; j < degree; j++)
             {
-                z.addChild(current.removeChild(0), j);
+                z.addChild(currentNode.removeChild(0), j);
                 BTreeNode temp = readNode(z.getChild(j));
                 temp.setParent(z.getOffset());
                 writeNode(temp, degree);
             }
         }
         //update/add nodes in file appropriately
-        if(this.parent != root) {
-        	writeNode(parent, degree);
-        	this.parent = readNode(parent.getOffset());
+        if(this.parent != root && parentNode != root) {
+        	writeNode(parentNode, degree);
+        	parent = readNode(parentNode.getOffset());
         }
         
-        writeNode(current, degree);
+        writeNode(currentNode, degree);
         writeNode(z, degree);
-        this.current = readNode(current.getOffset());
+        current = readNode(currentNode.getOffset());
         nodeCount++;
         return;
 	 }
@@ -543,7 +565,7 @@ public class BTree<T>
 			    private int n; // number of objects in the BTreeNode
 			    private int offset; // pointer to this node in file
 			    private int parent; // pointer to parent
-			    private int isLeaf; // leaf tracker int (treated as boolean)
+			    private int isLeaf; // leaf tracker int (treated as boolean) 0 - false, 1 - true
 			    
 			    //Keys and child pointers
 			    private ArrayList<TreeObject> keys;
