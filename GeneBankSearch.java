@@ -85,7 +85,7 @@ public class GeneBankSearch
 		//assumes that the user specified the proper BTree to use depending upon the query length.
 		try {
 			SequenceReader src = new SequenceReader(queryFile, sequence);
-			BTree tree = new BTree(degree, btreeFile, useCache, cacheSize); 
+			BTree tree = new BTree(degree, btreeFile, queryFile, useCache, cacheSize); 
 			Scanner scan = new Scanner(new File(queryFile));
 			
 			while(scan.hasNext()) {
