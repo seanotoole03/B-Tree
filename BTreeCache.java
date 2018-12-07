@@ -30,12 +30,15 @@ public class BTreeCache<BTreeNode> {
 	}
 	
 	//add an object to the front of the list. deletes last node if necessary
-	public void addObject (BTreeNode object) {
+	public BTreeNode addObject (BTreeNode object, int degree) {
+		BTreeNode temp = null;
+		
 		if (cache.size() >= maxSize) {
+			temp = cache.getLast();
 			cache.removeLast();
 		}
 		cache.addFirst(object);
-		return;
+		return temp;
 	}
 	
 	//takes object from node at given index, deletes the node, and moves object to the front
