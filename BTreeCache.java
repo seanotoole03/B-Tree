@@ -113,16 +113,16 @@ public class BTreeCache<BTreeNode> {
 	//in index.
 	private boolean compareObjectToNode(TreeObject object, int index)
 	{
-		BTreeNode temp = this.getObject(index);
-		
-		for (int i = 0; i < temp.getKeys.size(); i++)//can't reach getKeys?
-		{
-			//if keys are the same
-			if (object.compareTo(temp.getKey(i)) == 0)
-			{
-				return true;
-			}
-		}
+//		BTreeNode temp = this.getObject(index);
+//		
+//		for (int i = 0; i < temp.getKeys.size(); i++)//can't reach getKeys?
+//		{
+//			//if keys are the same
+//			if (object.compareTo(temp.getKey(i)) == 0)
+//			{
+//				return true;
+//			}
+//		}
 		//if nothing was found, return false
 		return false;
 	}

@@ -143,7 +143,14 @@ public class BTree<T>
     	try {
     		root.setOffset(rootOffset);
 			fileWrite.seek(rootOffset);
+			root.setOffset(rootOffset);
 			writeNode(root, degree);
+			root.setOffset(0);
+			fileWrite.seek(0);
+			fileWrite.writeInt(degree);
+			fileWrite.writeInt(rootOffset);
+			fileWrite.writeInt(nodeCount);
+			fileWrite.writeInt(height);
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.exit(0);
@@ -162,6 +169,8 @@ public class BTree<T>
         TreeObject obj = new TreeObject(k);
         boolean insertion = false;
         while(insertion == false) {
+        	
+        	
         	if(current.getN() == nodeMaxObj) { //current node is full
         		//TODO: How should we move the loop back up to the parent node? We will need to restart search from one level up.
         		// 1 DEC - Added code to splitting child nodes to move pointers up to appropriate locations - test at meeting
@@ -577,6 +586,16 @@ public class BTree<T>
 	 * @return root node
 	 */
 	public BTreeNode getRoot() {
+		return root;
+	}
+	
+	/**
+	 * Warning: ONLY USE FOR SEARCH INITIALIZATION OF ROOT
+	 * @param setNode
+	 * @return
+	 */
+	public BTreeNode setRoot(BTreeNode setNode) {
+		root = setNode;
 		return root;
 	}
 	

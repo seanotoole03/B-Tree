@@ -3,6 +3,7 @@ import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.Scanner;
 
+
 /**
  * This is a driver Class for searching a GeneBank generated BTree for
  * a list of query sequences.
@@ -15,13 +16,15 @@ public class GeneBankSearch
 	private static int useCache;
 	private static String btreeFile; 
 	private static String queryFile;
+	private static String subSequences;
 	private static int cacheSize; 
 	private static int debugLevel = 0;
 	private static TreeObject object;
+	private static long searchLong;
 
 	public static void main(String[] args) 
 	{
-
+		
 		//This if statement prints the usage if there are too little 
 		//or too many arguments
 		if(args.length < 3 || args.length > 5) 
@@ -39,7 +42,8 @@ public class GeneBankSearch
 		{
 			printUsage();
 		}
-
+		
+		
 		btreeFile = args[1]; //BTree File
 		queryFile = args[2]; //Query File 
 
@@ -80,23 +84,80 @@ public class GeneBankSearch
 		//System.out.println("degree: " + degree);
 		//System.out.println("sequence length: " + sequence);
 		
-		
+		subSequences = "";
 		//searching in the specified BTree for sequences of given length. The search program
 		//assumes that the user specified the proper BTree to use depending upon the query length.
 		try {
-			SequenceReader src = new SequenceReader(queryFile, sequence);
-			BTree tree = new BTree(degree, btreeFile, queryFile, useCache, cacheSize); 
+			File treeFile = new File(btreeFile);
+			if(treeFile.createNewFile()) {
+				System.out.println("Error, no such file!");
+				System.exit(0);
+			}
+			RandomAccessFile read = new RandomAccessFile(treeFile, "r");
+			BTree<TreeObject> tree = new BTree<TreeObject>(degree, btreeFile, queryFile, useCache, cacheSize);
+			read.seek(4); //position of rootOffset metadata
+			tree.getRoot().setOffset(read.readInt());
+			read.seek(tree.getRoot().getOffset());
+			tree.setRoot(tree.readNode(tree.getRoot().getOffset()));
+			read.seek(0);
+			
+			
 			Scanner scan = new Scanner(new File(queryFile));
 			
 			while(scan.hasNext()) {
+				subSequences = "";
 				String query = scan.nextLine(); //sequence to search for binary 
+				String currString = "";
+				int numValidReads = 0;
+				do 
+				{
+//					String.valueOf(currChar = fileReader.readChar());
+//					currChar = fileReader.readChar();
+					String currChar = query.substring(numValidReads, numValidReads+1);
+					currString += currChar;
+					//if good character found convert to binary and save in subsequence string
+					if (currChar.equalsIgnoreCase("a"))
+					{
+						numValidReads++;
+						subSequences += "00";
+					}
+					else if (currChar.equalsIgnoreCase("t"))
+					{
+						numValidReads++;
+						subSequences += "11";
+					}
+					else if (currChar.equalsIgnoreCase("c"))
+					{
+						numValidReads++;
+						subSequences += "01";						
+					}
+					else if (currChar.equalsIgnoreCase("g"))
+					{
+						numValidReads++;
+						subSequences += "10";
+					}
+					//if n found,clear subsequence, find next valid value and return
+					else if(currChar.equalsIgnoreCase("n"))
+					{
+						subSequences = "";
+
+					}
+
+				}while (numValidReads < sequence);
 				
-				long frequency = Long.parseLong(query,2); // trying to read the frequency of the object 
-				TreeObject result = tree.search(tree.getRoot(), frequency); //result should have root and frequency
+				if(!subSequences.isEmpty()) 
+					searchLong = Long.parseLong(subSequences, 2);
 				
-				if(result != null) 
-					System.out.println(Long.parseLong(result.toDNAString(sequence))+Integer.parseInt(seq)+": "+ result.getFrequency());
+				TreeObject found = tree.search(tree.getRoot(), searchLong);
+				
+				if(found != null) {
+					System.out.println(currString + ": " + found.getFrequency());
+				} else {
+					System.out.println(currString + ": " + 0);
+				}
 			}
+			
+			
 			
 			scan.close();
 		} catch (Exception e) {
