@@ -23,8 +23,9 @@ public class BTree<T>
 	private int baseOffset = 16;
 	private File file;
     private RandomAccessFile fileRead, fileWrite;
-   
-    private int tester = 0;
+    
+    private BTreeCache cache;
+    
     /**
      * Constructor for BTree - includes cache usage.
      * 
@@ -73,9 +74,80 @@ public class BTree<T>
         root.setIsLeaf(1); //New tree should have a root that is a leaf.
         
         //TODO: Implement cache functionality
+        if(useCache == 1) {
+        	cache = new BTreeCache(cacheSize);
+        }
         
         
-        
+    }
+    
+    /**
+     * Constructor for BTree - includes cache usage.
+     * 
+     * @param degree - indicates desired size of nodes
+     * @param fileName - file to be written to, default will be 'file' for testing and specified filename format 
+     * @param useCache - indicates whether the user would like a cache to be used for easier manipulation of frequently used data
+     * @param cacheSize - desired size of cache (if used)
+     */
+    public BTree(int degree, String inFileName, String outFileName, int useCache, int cacheSize)
+    {
+    	 BTreeNodeSize = 4 + (32*(degree)); //bytes -- 16 + (2t - 1)*12 + (2t)*4
+         nodeMaxObj = (2*degree)-1;
+         rootOffset = 16;
+         height = 0;
+         nodeCount = 1;
+         this.degree = degree;  
+         
+         file = new File(inFileName);
+         
+         try { 	//Initialize RandcomAccessFile reader and writer
+         	if(file.createNewFile()) {
+         		System.out.println("No such file!");
+         		file.delete();
+         		System.exit(0);
+         	}
+         	fileRead = new RandomAccessFile(file, "r");
+         	fileWrite = new RandomAccessFile(file, "rw");
+         } catch (FileNotFoundException e) {
+         	e.printStackTrace();
+         	System.exit(0);
+         } catch (IOException e) {
+         	e.printStackTrace();
+         	System.exit(0);
+         }
+         
+         root = new BTreeNode();
+         try {
+			root.setN(fileRead.readInt());
+			root.setOffset(fileRead.readInt());
+	        root.setParent(0);
+	        
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.exit(0);
+		}
+         
+         root.setIsLeaf(1); //New tree should have a root that is a leaf.
+         
+         //TODO: Implement cache functionality
+         if(useCache == 1) {
+         	cache = new BTreeCache(cacheSize);
+         }
+         
+    }
+    
+    /**
+     * Should write root to end of file. Call once rest of BTree has been created.
+     */
+    public void finalizeBTree() {
+    	try {
+    		root.setOffset(rootOffset);
+			fileWrite.seek(rootOffset);
+			writeNode(root, degree);
+		} catch (IOException e) {
+			e.printStackTrace();
+			System.exit(0);
+		}
     }
     
 	/**
@@ -556,7 +628,7 @@ public class BTree<T>
 		/**
 		 * This class
 		 * 
-		 * @author angelsanabria 
+		 * @author angelsanabria, seanotoole
 		 *
 		 */
 		public class BTreeNode 
@@ -768,7 +840,150 @@ public class BTree<T>
 			    }
 		}
 	
+	//Inner Class BTreeCache	
+		//author: Stephen Richardson
 		
-		
+
+		public class BTreeCache {
+			
+			private final Exception Exception = null;
+			
+			//cache linked lists
+			private LinkedList<BTreeNode> cache;
+			
+			//variables
+			int maxSize = 0; //the maximum size that the level 1 cache can be
+			
+			//statistic variables
+			int numRef = 0;//number of references to cache1
+			int numHits = 0;//number of hits on cache1
+			
+			//constructor
+			public BTreeCache (int max) {
+				cache = new LinkedList<BTreeNode>();
+				maxSize = max;
+			}	
+			/*   Methods   */
+			
+			private BTreeNode getObject (int index) throws Exception {
+				if (index >= cache.size()) {
+					throw Exception;
+				}
+				return cache.get(index);
+			}
+			
+			//add an object to the front of the list. deletes last node if necessary
+			public BTreeNode addObject (BTreeNode object, int degree) {
+				BTreeNode temp = null;
+				
+				if (cache.size() >= maxSize) {
+					temp = cache.getLast();
+					cache.removeLast();
+				}
+				cache.addFirst(object);
+				return temp;
+			}
+			
+			//takes object from node at given index, deletes the node, and moves object to the front
+			private void moveToFront (int index) {
+				BTreeNode object = cache.get(index);
+				cache.remove(index);
+				cache.addFirst(object);
+			}
+			
+			//deletes whatever is in front and replaces it with the passed in node
+			//meant to be used to update a node with changes made in the BTree class
+			public void replaceFront (BTreeNode object) {
+				cache.removeFirst();
+				cache.addFirst(object);
+			}
+			
+			//clear and reset cache
+			public void clearCache () {
+				cache.clear();
+				return;
+			}
+			
+			//returns cache1 hits
+			public int getCacheHits() {
+				return numHits;
+			}
+				
+			//returns cache1 refs
+			public int getCacheRef() {
+				return numRef;
+			}
+			
+			public void setMaxSize (int size) {
+				this.maxSize = size;
+			}
+			
+			//returns the hit ratio of cache1
+			public double getCacheHitRatio () {
+				
+				double hitRatio = ((double)numHits) / numRef;
+				return hitRatio;
+			}
+			
+			//search for a treeObject in the nodes stored in cache. if found, return the node
+			//and move it to the front to be replaced with an updated version.
+			//otherwise return null
+			/**
+			 * This is a BTreeNode return method
+			 * @param object
+			 * @return
+			 * @throws java.lang.Exception
+			 */
+			public BTreeNode searchForHit (TreeObject object) throws java.lang.Exception {
+				int index = 0;
+				boolean hit = false;
+				
+				//record a reference to cache1
+				numRef++;
+				//search cache1 for object
+				while (index < cache.size() && hit == false) 
+				{			
+					hit = compareObjectToNode(object, index);
+					
+					if (hit == true)
+					{
+						//move the matching node to the front and return it
+						numHits++;
+						this.moveToFront(index);
+						return this.getObject(0);
+					}
+				}//end search cache1 while loop
+				
+				//if we reach this, no nodes were found and we exit the method.
+				return null;
+			}//end SearchForHit method
+			
+			//compares the passed in treeObject with every tree object in the node at the passed
+			//in index.
+			private boolean compareObjectToNode(TreeObject object, int index)
+			{
+				BTreeNode temp = null;
+				try {
+					temp = this.getObject(index);
+				} catch (java.lang.Exception e) {
+					System.out.println("Cache read error - please switch to cache value of 0 (no cache) in GeneSequencingCreateaBTree arguments and contact the creators, a patch will be released as soon as possible.");
+					e.printStackTrace();
+					System.exit(0);
+				}
+				
+				for (int i = 0; i < (temp.getKeys().size()); i++)//can't reach getKeys?
+				{
+					//if keys are the same
+					if (object.compareTo(temp.getKey(i)) == 0)
+					{
+						return true;
+					}
+				}
+				//if nothing was found, return false
+				return false;
+			}
+			
+		}
+	
 		
 }

@@ -4,7 +4,11 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
 
-
+/**
+ * 
+ * @author seanotoole
+ *
+ */
 public class GeneBankCreateBTree {
 	
 	private BTree<TreeObject> tree;
@@ -93,7 +97,7 @@ public class GeneBankCreateBTree {
 	 * @return
 	 */
 	public static int optimalDegree() { //TODO: test this
-		return ( (4096 - 16 + 12) / (32) );
+		return ( ((4096 - 16) + 12) / (32) );
 	}
 
 	public static void main(String[] args) { //should parse all 4-6 arguments, run CreateTree method as appropriate
@@ -142,9 +146,9 @@ public class GeneBankCreateBTree {
 		
 		
 		int sequenceLength = Integer.parseInt(args[3]);
-		if(sequenceLength < 2) {
+		if(sequenceLength < 2 || sequenceLength > 31) {
 			System.out.println(usage());
-			System.out.println("Sequence length should be longer than 1");
+			System.out.println("Sequence length should be longer than 1 and smaller than 32");
 			System.exit(0);
 		}
 		
@@ -155,16 +159,26 @@ public class GeneBankCreateBTree {
 			cacheSize = Integer.parseInt(args[4]);
 			if(args.length == 6)
 				debug = Integer.parseInt(args[5]);
-			
+			if(debug != 0 && debug != 1) {
+				System.out.println(usage());
+				System.out.println("Valid debug levels include only 0 and 1");
+				System.exit(0);
+			}
 		} else {
 			if(args.length == 5) //debug level chosen
 				debug = Integer.parseInt(args[4]); 
+			if(debug != 0 && debug != 1) {
+				System.out.println(usage());
+				System.out.println("Valid debug levels include only 0 and 1");
+				System.exit(0);
+			}
 		}
 		
 		
 		
 		String newFileName = fileNameGenerate(fileName, degree, sequenceLength);
 		GeneBankCreateBTree btree = new GeneBankCreateBTree(cache, degree, fileName, newFileName, sequenceLength, cacheSize, debug);
+		btree.tree.finalizeBTree();
 	}
 
 }
